@@ -6,10 +6,10 @@ export function sendMessage(ws:CustomWebSocket, message: ServerMessage):void {
   ws.send(JSON.stringify(message))
 }
 
-export function sendError(ws: CustomWebSocket, message:  ErrorPayload): void {
+export function sendError(ws: CustomWebSocket, payload:  ErrorPayload): void {
   const res = {
     type: "ERROR" as const,
-    message
+    payload
   }
   ws.send(JSON.stringify(res))
 }

@@ -26,7 +26,12 @@ export const Chatbox: React.FC = () => {
     
     const ubsubscribeHandleAllActiveClients = eventBusInstance.subscribe("ALL_ACTIVE_CLIENTS", handleGetAllActiveClients)
     const ubsubscribeToRegisterUsername = eventBusInstance.subscribe("MESSAGE_FROM_USER",  handleMessageFromUser)
+    const ubsubscribeToUsernameTakenError = eventBusInstance.subscribe("ERROR:USERNAME_TAKEN" , handleUsernameTaken)
 
+    return () => {
+      ubsubscribeHandleAllActiveClients()
+      ubsubscribeToRegisterUsername()
+    }
   } , [])
 
   const handleMessageFromUser = (payload: MessageFromUserPayload) => {
@@ -47,6 +52,11 @@ export const Chatbox: React.FC = () => {
       }
     })
   }
+  const handleUsernameTaken = () => {
+    setUsername('')
+    // console.log("username taken")
+    window.alert("Username is already taken")
+  }
 
   const sendMessageToUser = (username: string, value: string) => {
     ws.emit({
@@ -65,7 +75,7 @@ export const Chatbox: React.FC = () => {
     })
   }
   
-  const handleGetAllActiveClients = (payload: ReturnAllActiveClientsPayload , setAllUsernames: React.Dispatch<React.SetStateAction<string[]>>) => {
+  const handleGetAllActiveClients = (payload: ReturnAllActiveClientsPayload) => {
 
     const { clients } = payload    
     setAllUsernames(clients)
@@ -99,7 +109,7 @@ export const Chatbox: React.FC = () => {
               {
                 allUsernames.map((username) => {
                   return (
-                    <div>
+                    <div key={username}>
                       <p>{username}</p>
                       <Button onClick={() => {
                         setCurrentPeer(username)
@@ -109,7 +119,7 @@ export const Chatbox: React.FC = () => {
                         <div>
                           <input  type="text" className="bg-red-200 mt-4 m-2 p-4" onChange={(e) => setMessage(e.target.value)} />
                           <Button onClick={() => {
-                            
+                            sendMessageToUser(username , message)
                           }}>Send</Button>
                         </div>
                       )}
@@ -129,6 +139,9 @@ export const Chatbox: React.FC = () => {
           )
         }
       </ul>
+      <div>
+        helllow
+      </div>
     </div>
   )
 }

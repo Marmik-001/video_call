@@ -15,8 +15,8 @@ class ConnectionManager {
   public remove(username: string): void {
     this.connections.delete(username)
   }
-  public has(username: string): void {
-    this.connections.has(username)
+  public has(username: string): boolean {
+    return this.connections.has(username)
   }
   public getAllUsernames(): string[] {
     return Array.from(this.connections.keys());

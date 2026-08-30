@@ -1,7 +1,15 @@
 import { ConnectionManagerInstance, ConnectionManagerInstance as connections} from "../service/connectionManager.js";
 import type { CustomWebSocket, ClientMessage, SetUsernamePayload } from "../types/websocket.types.js";
+import { sendError } from "../utils/ws.utils.js";
 
 export const setUsername = (payload: SetUsernamePayload, ws: CustomWebSocket): void => {
+
+  if (ConnectionManagerInstance.has(payload.username)) {
+    sendError(ws, {
+      code: "USERNAME_TAKEN",
+      message: "This username is already taken " + payload.username,
+    })
+  }
 
   ConnectionManagerInstance.add(payload.username, ws)
   ws.username = payload.username;

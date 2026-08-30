@@ -30,12 +30,9 @@ export const messageReceivedHandler = (
 export const getAllUsernamesHandler = (ws: CustomWebSocket) => {
 
   if (!ws.username) {
-
-    const newErr =  new Error("Unauthenticated")
     const authErr: ErrorPayload = {
       code: "UNAUTHENTICATED",
-      message: "username not found",
-
+      message: "username not found", 
     }
     sendError(ws , authErr)
   }

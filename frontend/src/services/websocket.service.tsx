@@ -34,6 +34,7 @@ class Websocket {
         }
     
         if (data.type === "ERROR") {
+            console.log(data.payload.code)
             eventBusInstance.publish(`ERROR:${data.payload.code}`, data.payload)
             eventBusInstance.publish(`ERROR`, data.payload)
             return;
