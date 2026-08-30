@@ -33,8 +33,9 @@ export const getAllUsernamesHandler = (ws: CustomWebSocket) => {
 
     const newErr =  new Error("Unauthenticated")
     const authErr: ErrorPayload = {
-        err: newErr,
-        errMsg:"username not found in the db"
+      code: "UNAUTHENTICATED",
+      message: "username not found",
+
     }
     sendError(ws , authErr)
   }

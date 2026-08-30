@@ -3,8 +3,14 @@ import { useWs , connectWS } from "@/api/ws"
 import { emitEvents } from "@/helper/EmitEvents"
 import { useEffect, useRef, useState } from "react"
 import { parseWebSocketResponse } from "@/utils/websocket.utils"
-import type { ReturnAllActiveClientsPayload } from "@/types/websocketResponse.types"
+import type { MessageFromUserPayload, ReturnAllActiveClientsPayload } from "@/types/websocket.types"
+import { socketService as ws } from "@/services/websocket.service"
+import { eventBusInstance } from "@/learn/eventBus"
 
+type InboxType = {
+  username: string,
+  message: string
+}
 export const Chatbox: React.FC = () => {
   
   const [username, setUsername] = useState("")
@@ -14,103 +20,49 @@ export const Chatbox: React.FC = () => {
   const [currentPeer , setCurrentPeer] = useState<string | null>(null)
   const [chatModal , setChatModal] = useState(false)
   const [message, setMessage] = useState('')
-  // const { connectWS , disconnectFromWS , error , isLoading , oneToOneMsg , roomCreation }  = useWs()
-
-
-  const wsOnMessageHandler = (e:MessageEvent) => {
-    setError(null)
-      console.log("data: " , e.data , "type of data: " , typeof(e.data))
-      const res = parseWebSocketResponse(e.data)
-      if (res instanceof Error) {
-        setError(res)
-      } else {
-        switch (res.type) {
-          case "ALL_ACTIVE_CLIENTS": {
-            handleGetAllActiveClients(res.payload , setAllUsernames)
-          }
-        } 
-      }
-  }
-
-  const wsOnOpenHandler = () => {
-    console.log("connection opened")
-  }
-
-  const wsOnCloseHandler = () => {
-    console.log("connection closed")
-  }
+  const [inbox , setInbox] = useState<InboxType[]>([])
 
   useEffect(() => {
     
+    const ubsubscribeHandleAllActiveClients = eventBusInstance.subscribe("ALL_ACTIVE_CLIENTS", handleGetAllActiveClients)
+    const ubsubscribeToRegisterUsername = eventBusInstance.subscribe("MESSAGE_FROM_USER",  handleMessageFromUser)
 
-    const ws = new WebSocket('ws://localhost:8080')
-    wsRef.current = ws
-    
-
-    ws.onopen = () => {
-      wsOnOpenHandler()
-    }
-
-    ws.onclose = () => {
-      wsOnCloseHandler()
-    }
-
-    ws.onmessage = (e) => {
-      wsOnMessageHandler(e)
-    }
-
-    
-    return () => {
-      ws.close()
-      wsRef.current = null
-    }
-    
   } , [])
 
+  const handleMessageFromUser = (payload: MessageFromUserPayload) => {
+    const { from_username, message } = payload
+    setInbox((prev) => [...prev, {
+      username: from_username,
+      message: message,
+    } ])
+    
+  }
 
   const registerUsername = (username: string) => {
     setError(null)
-    if (wsRef.current) {
-      emitEvents(wsRef.current, {
-        type: "SET_USERNAME", 
-        payload: {
-          username:username
-        }
-      })
-    } else {
-      const e = new Error("Connection not found")
-      setError(e)
-    }
+    ws.emit({
+      type: "SET_USERNAME",
+      payload: {
+        username: username
+      }
+    })
   }
 
   const sendMessageToUser = (username: string, value: string) => {
-    setError(null)
-    if (wsRef.current) {
-      emitEvents(wsRef.current, {
-        type: "", 
-        payload: {
-          username:username
-        }
-      })
-    } else {
-      const e = new Error("Connection not found")
-      setError(e)
-    }
+    ws.emit({
+      type: "MESSAGE_RECEIVED",
+      payload: {
+        message: value,
+        target_username: username
+      }
+    })
   }
 
   const getAllUsers = () => {
     setError(null)
-    if (wsRef.current) {
-
-      emitEvents(wsRef.current, {
-        type: "GET_ALL_USERNAMES",
-        payload: null
-      })
-    } else {
-      const e = new Error("Connection not found")
-      setError(e)
-      // const mediaError = e instanceof Error ? new Error('failed to access media devices')
-    }
+    ws.emit({
+      type: "GET_ALL_USERNAMES",
+    })
   }
   
   const handleGetAllActiveClients = (payload: ReturnAllActiveClientsPayload , setAllUsernames: React.Dispatch<React.SetStateAction<string[]>>) => {

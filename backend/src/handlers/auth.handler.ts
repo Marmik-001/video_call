@@ -1,7 +1,6 @@
 import { ConnectionManagerInstance, ConnectionManagerInstance as connections} from "../service/connectionManager.js";
 import type { CustomWebSocket, ClientMessage, SetUsernamePayload } from "../types/websocket.types.js";
 
-
 export const setUsername = (payload: SetUsernamePayload, ws: CustomWebSocket): void => {
 
   ConnectionManagerInstance.add(payload.username, ws)

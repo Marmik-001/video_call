@@ -1,4 +1,4 @@
-import type { ServerMessage } from "@/types/websocketResponse.types";
+import type { ServerMessage } from "@/types/websocket.types";
 
 
 export function parseWebSocketResponse(
@@ -9,7 +9,6 @@ export function parseWebSocketResponse(
   } catch (err) {
     console.error("error in parsing data", err);
     if (err instanceof Error) {
-
       return err;
     }
       return new Error('error parsing')

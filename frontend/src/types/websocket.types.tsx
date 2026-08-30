@@ -1,11 +1,3 @@
-import type { WebSocket } from "ws";
-export interface CustomWebSocket extends WebSocket {
-  username?: string;
-  isAlive?: boolean;
-}
-
-
-
 // -------------------------------------------------------------
 //                                                            // 
 //                                                            //
@@ -14,11 +6,12 @@ export interface CustomWebSocket extends WebSocket {
 // -------------------------------------------------------------
 
 
+
 export interface MessageFromUserPayload {
   from_username: string;
   message: string;
 }
-
+  
 export interface MessageToAllClientsPayload {
   message: string;
   from_username?: string;
@@ -26,6 +19,7 @@ export interface MessageToAllClientsPayload {
 export interface ReturnAllActiveClientsPayload {
   clients: string[];
 }
+
 export type ErrorCode = 
   | "UNAUTHENTICATED"
   | "UNAUTORIZED"
@@ -60,10 +54,13 @@ export type ServerMessage =
   | {
       type: "ALL_ACTIVE_CLIENTS";
       payload: ReturnAllActiveClientsPayload;
-    };
+};
+
 
 export type ServerMessageType = ServerMessage["type"]
 export type ServerMessagePayload = ServerMessage["payload"]
+
+
 // -------------------------------------------------------------
 //                                                            // 
 //                                                            //
