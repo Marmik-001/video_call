@@ -2,6 +2,8 @@ import { ConnectionManagerInstance, ConnectionManagerInstance as connections} fr
 import type { CustomWebSocket, ClientMessage, SetUsernamePayload } from "../types/websocket.types.js";
 import { sendError } from "../utils/ws.utils.js";
 
+
+
 export const setUsername = (payload: SetUsernamePayload, ws: CustomWebSocket): void => {
 
   if (ConnectionManagerInstance.has(payload.username)) {

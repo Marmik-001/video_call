@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button"
-import { useWs , connectWS } from "@/api/ws"
 import { emitEvents } from "@/helper/EmitEvents"
 import { useEffect, useRef, useState } from "react"
 import { parseWebSocketResponse } from "@/utils/websocket.utils"
@@ -14,6 +13,7 @@ type InboxType = {
 export const Chatbox: React.FC = () => {
   
   const [username, setUsername] = useState("")
+  const usernameRef = useRef("")
   const wsRef = useRef<WebSocket | null>(null)
   const [error , setError] = useState<Error | null>(null)
   const [allUsernames , setAllUsernames]  = useState<string[]>([])
@@ -31,6 +31,7 @@ export const Chatbox: React.FC = () => {
     return () => {
       ubsubscribeHandleAllActiveClients()
       ubsubscribeToRegisterUsername()
+      ubsubscribeToUsernameTakenError()
     }
   } , [])
 
@@ -54,6 +55,7 @@ export const Chatbox: React.FC = () => {
   }
   const handleUsernameTaken = () => {
     setUsername('')
+    usernameRef.current = ''
     // console.log("username taken")
     window.alert("Username is already taken")
   }
@@ -78,7 +80,10 @@ export const Chatbox: React.FC = () => {
   const handleGetAllActiveClients = (payload: ReturnAllActiveClientsPayload) => {
 
     const { clients } = payload    
-    setAllUsernames(clients)
+    const newClients = clients.filter((name) => {
+      return name !== usernameRef.current
+    })
+    setAllUsernames(newClients)
   }
 
   return (
@@ -87,6 +92,7 @@ export const Chatbox: React.FC = () => {
         <input
           onChange={(e) => {
             setUsername(e.target.value)
+            usernameRef.current =  e.target.value
           }}
           value={username}
           className="bg-black, text-white w-100 border-2 border-cyan-700"
@@ -101,11 +107,11 @@ export const Chatbox: React.FC = () => {
       }}>
         get all users
       </Button>
-      <ul className="bg-gray-300">
+      <div className="bg-gray-300">
         {
           allUsernames.length > 0 ? 
           (
-            <div>
+            <ul>
               {
                 allUsernames.map((username) => {
                   return (
@@ -127,7 +133,7 @@ export const Chatbox: React.FC = () => {
                   )
                 })
               }
-            </div>
+            </ul>
           ):
           (
             <div className="bg-red-400 p-2 m-2 size-10  content-center rounded-xl w-1/2">
@@ -138,9 +144,23 @@ export const Chatbox: React.FC = () => {
               </div>
           )
         }
-      </ul>
-      <div>
-        helllow
+      </ div>
+      <div className="bg-purple-200">
+        {
+          inbox.length > 0 ? (
+            inbox.map(({message , username}) => {
+              return (
+                <div key={username}>
+                  { username } : { message }
+                </div>
+              )
+            })
+          ) : (
+              <div>
+                NO MESSEGES YET
+              </div>
+          )
+        }
       </div>
     </div>
   )
