@@ -12,6 +12,14 @@ export const setUsername = (payload: SetUsernamePayload, ws: CustomWebSocket): v
       message: "This username is already taken " + payload.username,
     })
   }
+  
+  if (payload.username === '') {
+    sendError(ws, {
+      code: "USERNAME_EMPTY",
+      message:"Username cannot be empty"
+    })
+    return;
+  }
 
   ConnectionManagerInstance.add(payload.username, ws)
   ws.username = payload.username;

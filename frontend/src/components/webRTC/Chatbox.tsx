@@ -5,6 +5,8 @@ import { parseWebSocketResponse } from "@/utils/websocket.utils"
 import type { MessageFromUserPayload, ReturnAllActiveClientsPayload } from "@/types/websocket.types"
 import { socketService as ws } from "@/services/websocket.service"
 import { eventBusInstance } from "@/learn/eventBus"
+import { webRTCInstance } from "@/services/webRTC.service"
+import { useUserMedia } from "@/hooks/useUserMedia"
 
 type InboxType = {
   username: string,
@@ -12,7 +14,7 @@ type InboxType = {
 }
 export const Chatbox: React.FC = () => {
   
-  const [username, setUsername] = useState("")
+  const [currUsername, setCurrUsername] = useState("")
   const usernameRef = useRef("")
   const wsRef = useRef<WebSocket | null>(null)
   const [error , setError] = useState<Error | null>(null)
@@ -21,7 +23,8 @@ export const Chatbox: React.FC = () => {
   const [chatModal , setChatModal] = useState(false)
   const [message, setMessage] = useState('')
   const [inbox , setInbox] = useState<InboxType[]>([])
-
+  const {  requestPermission , stopStream , stream , error: streamError  } = useUserMedia({video:true , audio:true})
+  
   useEffect(() => {
     
     const ubsubscribeHandleAllActiveClients = eventBusInstance.subscribe("ALL_ACTIVE_CLIENTS", handleGetAllActiveClients)
@@ -44,8 +47,13 @@ export const Chatbox: React.FC = () => {
     
   }
 
+
   const registerUsername = (username: string) => {
     setError(null)
+    if (username === '') {
+      window.alert("Username cannot be empty")
+      return;
+    }
     ws.emit({
       type: "SET_USERNAME",
       payload: {
@@ -54,7 +62,7 @@ export const Chatbox: React.FC = () => {
     })
   }
   const handleUsernameTaken = () => {
-    setUsername('')
+    setCurrUsername('')
     usernameRef.current = ''
     // console.log("username taken")
     window.alert("Username is already taken")
@@ -76,6 +84,20 @@ export const Chatbox: React.FC = () => {
       type: "GET_ALL_USERNAMES",
     })
   }
+
+  const handleCallToUsername = async (call_to_username: string) => {
+    const streamRes = await requestPermission()
+    if (streamRes === null) {
+      console.log('stream error: ', streamError)
+      return
+    }
+
+    webRTCInstance.initiateCall({stream:streamRes ,call_to: call_to_username , myUsername:currUsername })
+  }
+
+  const handleCallEnd = async() => {
+    stopStream()
+  }
   
   const handleGetAllActiveClients = (payload: ReturnAllActiveClientsPayload) => {
 
@@ -91,15 +113,16 @@ export const Chatbox: React.FC = () => {
       <div className="flex flex-row">
         <input
           onChange={(e) => {
-            setUsername(e.target.value)
+            setCurrUsername(e.target.value)
             usernameRef.current =  e.target.value
           }}
-          value={username}
+          value={currUsername
+          }
           className="bg-black, text-white w-100 border-2 border-cyan-700"
         />
 
         <Button onClick={() => {
-          registerUsername(username)
+          registerUsername(currUsername)
         }}> Join rooms with this name </Button>
       </div>
       <Button onClick={() => {
@@ -127,6 +150,10 @@ export const Chatbox: React.FC = () => {
                           <Button onClick={() => {
                             sendMessageToUser(username , message)
                           }}>Send</Button>
+                          <Button onClick={() => {
+                            handleCallToUsername(username)
+                          }}>Call</Button>
+                          <Button onClick={() => handleCallEnd()}>end call</Button>
                         </div>
                       )}
                     </div>

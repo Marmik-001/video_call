@@ -1,10 +1,10 @@
-import { useUserMedia } from "@/hooks/useUserMedia"
+// import { useUserMedia } from "@/hooks/useUserMedia"
 import { configuration } from "@/utils/stunServers"
-type ModeType = {
-    audio: boolean 
-    video: boolean
-    screenShare: boolean
-}
+// type ModeType = {
+//     audio: boolean 
+//     video: boolean
+//     screenShare: boolean
+// }
 
 interface InitiateCallPayload {
     stream: MediaStream
@@ -21,6 +21,7 @@ interface ReceiveCallPayload {
 import { socketService } from "./websocket.service"
 class WebRTC {
 
+    private pc:null | RTCPeerConnection = null
     /**
      * initiateCall
      */
@@ -30,14 +31,15 @@ class WebRTC {
         
         try {
             
-            const pc = new RTCPeerConnection(configuration)
-            const { call_to , myUsername , stream } = payload
+            this.pc = new RTCPeerConnection(configuration)
+            const { call_to, myUsername, stream } = payload
+            
             for (const track of stream.getTracks()) {
-                pc.addTrack(track)
+                this.pc.addTrack(track)
             }
     
-            const offer = await pc.createOffer()
-            await pc.setLocalDescription(offer)
+            const offer = await this.pc.createOffer()
+            await this.pc.setLocalDescription(offer)
             socketService.emit({
                 type: "OFFER",
                 payload: {
@@ -46,14 +48,14 @@ class WebRTC {
                     from: myUsername
                 }
             })
-            pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e , pc , myUsername , call_to )
+
+            this.pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e , myUsername , call_to )
             
             
 
         } catch (err) {
             console.error("error in initiating call: " , err)
         }
-        
 
     }
 
@@ -64,28 +66,28 @@ class WebRTC {
         try {
 
             const { call_from , myUsername , remoteOffer , stream } = payload
-            const pc = new RTCPeerConnection(configuration)
-            await pc.setRemoteDescription(remoteOffer)
+            this.pc = new RTCPeerConnection(configuration)
+            await this.pc.setRemoteDescription(remoteOffer)
             for (const track of stream.getTracks()) {
-                pc.addTrack(track)
+                this.pc.addTrack(track)
             }
 
-            pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e , pc, myUsername , call_from)
+            this.pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e, myUsername , call_from)
             
-            pc.ontrack = e => this.handleOntrack(e , pc)
+            this.pc.ontrack = e => this.handleOntrack(e)
         } catch (err) {
             
         }
     }
 
 
-    private handleOntrack(e:RTCTrackEvent , pc:RTCPeerConnection) {
+    private handleOntrack(e:RTCTrackEvent) {
         
     }
-    private handleOnIceCandidateEvent(e: RTCPeerConnectionIceEvent, pc: RTCPeerConnection , from:string, to:string) {
+    private handleOnIceCandidateEvent(e: RTCPeerConnectionIceEvent, from: string, to: string) {
         if (!e.candidate) {
             console.log("ice candidate not in the event")
-            return
+            return;
         }
         socketService.emit({
             type: "NEW_ICE_CANDIDATE",

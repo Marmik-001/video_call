@@ -33,11 +33,25 @@ export type ErrorCode =
   | "INTERNAL_SERVER_ERROR"
   | "USER_NOT_FOUND"
   | "USERNAME_TAKEN"
+  | "USERNAME_EMPTY"
+  | "WRONG_USER"
 
 export interface ErrorPayload {
   code: ErrorCode
   message: string;
   targetUser?: string
+}
+
+export type OfferFromUserPayload  = {
+  to: string,
+  from: string,
+  offer: RTCSessionDescriptionInit
+}
+
+export type IceCandidatePayload = {
+  to: string,
+  from: string,
+  iceCandidate: RTCIceCandidate
 }
 
 export type ServerMessage =
@@ -60,8 +74,15 @@ export type ServerMessage =
   | {
       type: "ALL_ACTIVE_CLIENTS";
       payload: ReturnAllActiveClientsPayload;
-    };
-
+  }
+  | {
+    type: "OFFER_FROM_USER";
+    payload: OfferFromUserPayload
+  } 
+  | {
+    type: "ICE_CANDIDATE_TO_USER";
+    payload: IceCandidatePayload;
+  }
 export type ServerMessageType = ServerMessage["type"]
 export type ServerMessagePayload = ServerMessage["payload"]
 // -------------------------------------------------------------
@@ -87,6 +108,19 @@ export interface OfferInitiatorPayload {
   target_username: string;
 }
 
+export interface NewIceCandidatePayload {
+  iceCandidate: RTCIceCandidate
+  to: string
+  from: string
+}
+
+export interface OfferPayload {
+  to: string,
+  from: string,
+  offer: RTCSessionDescriptionInit
+}
+
+
 export type ClientMessage =
   | {
       type: "SET_USERNAME";
@@ -95,11 +129,16 @@ export type ClientMessage =
   | {
       type: "MESSAGE_RECEIVED";
       payload: MessageReceivedPayload;
-    }
-  | {
-      type: "OFFER_INITIATOR";
-      payload: OfferInitiatorPayload;
-    }
+  }
   | {
       type: "GET_ALL_USERNAMES";
-    };
+  }
+  | {
+    type: "NEW_ICE_CANDIDATE";
+    payload: NewIceCandidatePayload
+
+  }
+  | {
+    type: "OFFER";
+    payload: OfferPayload
+  }

@@ -27,6 +27,8 @@ export type ErrorCode =
   | "INTERNAL_SERVER_ERROR"
   | "USER_NOT_FOUND"
   | "USERNAME_TAKEN"
+  | "USERNAME_EMPTY"
+  | "WRONG_USER"
 
 export interface ErrorPayload {
   code: ErrorCode
@@ -34,37 +36,47 @@ export interface ErrorPayload {
   targetUser?: string
 }
 
-export interface InitialOfferPayload {
-  from_username: string;
-  offer: RTCSessionDescriptionInit;
+
+export type OfferFromUserPayload  = {
+  to: string,
+  from: string,
+  offer: RTCSessionDescriptionInit
 }
 
+export type IceCandidatePayload = {
+  to: string,
+  from: string,
+  iceCandidate: RTCIceCandidate
+}
 export type ServerMessage =
   | {
     type: "ERROR";
     payload: ErrorPayload
   }
   | {
-    type: "MESSAGE_FROM_USER";
-    payload: MessageFromUserPayload;
+      type: "MESSAGE_FROM_USER";
+      payload: MessageFromUserPayload;
+    }
+  | {
+      type: "SERVER_PING";
+      payload: null
+    }
+  | {
+      type: "TO_ALL_CLIENTS";
+      payload: MessageToAllClientsPayload;
+    }
+  | {
+      type: "ALL_ACTIVE_CLIENTS";
+      payload: ReturnAllActiveClientsPayload;
   }
   | {
-    type: "SERVER_PING";
-    payload: null
+    type: "OFFER_FROM_USER";
+    payload: OfferFromUserPayload
   }
   | {
-    type: "TO_ALL_CLIENTS";
-    payload: MessageToAllClientsPayload;
+    type: "ICE_CANDIDATE_TO_USER";
+    payload: IceCandidatePayload;
   }
-  | {
-    type: "ALL_ACTIVE_CLIENTS";
-    payload: ReturnAllActiveClientsPayload;
-  }
-  | {
-    type: "INITIAL_OFFER";
-    payload: InitialOfferPayload;
-  }
-
 export type ServerMessageType = ServerMessage["type"]
 export type ServerMessagePayload = ServerMessage["payload"]
 

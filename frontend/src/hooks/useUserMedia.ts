@@ -37,7 +37,7 @@ export const useUserMedia = (
     setIsLoading(true);
     setError(null);
 
-    if (!navigator.mediaDevices?.getUserMedia()) {
+    if (!navigator.mediaDevices?.getUserMedia(constraints)) {
       const err = new Error("media devices api not found in this browser")
       setError(err)
       setIsLoading(false)

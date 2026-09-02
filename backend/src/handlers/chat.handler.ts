@@ -34,7 +34,8 @@ export const getAllUsernamesHandler = (ws: CustomWebSocket) => {
       code: "UNAUTHENTICATED",
       message: "username not found", 
     }
-    sendError(ws , authErr)
+    sendError(ws, authErr)
+    return
   }
 
   const clientsArr = ConnectionManagerInstance.getAllUsernames();
