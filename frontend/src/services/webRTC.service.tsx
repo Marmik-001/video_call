@@ -21,7 +21,8 @@ interface ReceiveCallPayload {
 import { socketService } from "./websocket.service"
 class WebRTC {
 
-    private pc:null | RTCPeerConnection = null
+    private pc: null | RTCPeerConnection = null
+    private iceCandidatesBufferQueue : RTCIceCandidate[] = []
     /**
      * initiateCall
      */
@@ -51,7 +52,7 @@ class WebRTC {
 
             this.pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e , myUsername , call_to )
             
-            
+            this.pc.ontrack = e => this.handleOntrack(e)
 
         } catch (err) {
             console.error("error in initiating call: " , err)
@@ -68,23 +69,42 @@ class WebRTC {
             const { call_from , myUsername , remoteOffer , stream } = payload
             this.pc = new RTCPeerConnection(configuration)
             await this.pc.setRemoteDescription(remoteOffer)
+            await this.handleIncomingIceCandidates()
             for (const track of stream.getTracks()) {
                 this.pc.addTrack(track)
             }
 
             this.pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e, myUsername , call_from)
-            
             this.pc.ontrack = e => this.handleOntrack(e)
         } catch (err) {
             
         }
     }
 
+    public async handleIncomingIceCandidates() {
+        
+        if
+        while (this.iceCandidatesBufferQueue.length > 0) {
+            const candidate = this.iceCandidatesBufferQueue.shift()
+            this.pc?.addIceCandidate(candidate)
+        }
+    }
+
+    private onRemoteStreamReceived: ((stream:MediaStream) => void) | null = null
+
+    public setOnRemoteStream(callback: (stream:MediaStream) => void )  {
+        this.onRemoteStreamReceived = callback
+    }
 
     private handleOntrack(e:RTCTrackEvent) {
-        
+        if (e.streams && e.streams[0]) {
+            // this shit is nothing but just checking if onremotestreamreceived is null or a function, if its a function, we pass in the streams[0] as argument and call the function
+            console.log("stream found...")
+            this.onRemoteStreamReceived?.(e.streams[0])
+        }
     }
-    private handleOnIceCandidateEvent(e: RTCPeerConnectionIceEvent, from: string, to: string) {
+    private handleOnIceCandidateEvent(e: RTCPeerConnectionIceEvent, from: string, to: string ) {
+
         if (!e.candidate) {
             console.log("ice candidate not in the event")
             return;
