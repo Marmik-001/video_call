@@ -1,5 +1,8 @@
 // import { useUserMedia } from "@/hooks/useUserMedia"
 import { configuration } from "@/utils/stunServers"
+import { socketService } from "./websocket.service"
+import { eventBusInstance } from "@/learn/eventBus"
+import type { IceCandidatePayload } from "@/types/websocket.types"
 // type ModeType = {
 //     audio: boolean 
 //     video: boolean
@@ -18,11 +21,19 @@ interface ReceiveCallPayload {
     remoteOffer: RTCSessionDescriptionInit   
 }
 
-import { socketService } from "./websocket.service"
 class WebRTC {
 
     private pc: null | RTCPeerConnection = null
     private iceCandidatesBufferQueue : RTCIceCandidate[] = []
+
+    constructor() {
+        this.setupSignalingIncoming()
+    }
+
+    private setupSignalingIncoming() {
+        eventBusInstance.subscribe("ICE_CANDIDATE_TO_USER" , ( payload: IceCandidatePayload ) =>  this.handleIncomingIceCandidates(payload))
+    }
+
     /**
      * initiateCall
      */
@@ -50,7 +61,7 @@ class WebRTC {
                 }
             })
 
-            this.pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e , myUsername , call_to )
+            this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e, myUsername, call_to)
             
             this.pc.ontrack = e => this.handleOntrack(e)
 
@@ -69,7 +80,7 @@ class WebRTC {
             const { call_from , myUsername , remoteOffer , stream } = payload
             this.pc = new RTCPeerConnection(configuration)
             await this.pc.setRemoteDescription(remoteOffer)
-            await this.handleIncomingIceCandidates()
+            await this.handleBufferedIceCandidates()
             for (const track of stream.getTracks()) {
                 this.pc.addTrack(track)
             }
@@ -81,12 +92,20 @@ class WebRTC {
         }
     }
 
-    public async handleIncomingIceCandidates() {
+    public async handleIncomingIceCandidates(payload: IceCandidatePayload) {
         
-        if
+        if (!this.pc?.currentRemoteDescription) {
+            this.iceCandidatesBufferQueue.push(payload.iceCandidate)
+            console.log("ice candidate added to the buffer queue")
+            return 
+        } 
+        await this.handleBufferedIceCandidates()
+    }
+
+    private async handleBufferedIceCandidates() {
         while (this.iceCandidatesBufferQueue.length > 0) {
             const candidate = this.iceCandidatesBufferQueue.shift()
-            this.pc?.addIceCandidate(candidate)
+            await this.pc?.addIceCandidate(candidate)
         }
     }
 
