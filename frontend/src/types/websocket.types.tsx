@@ -43,6 +43,12 @@ export type OfferFromUserPayload  = {
   offer: RTCSessionDescriptionInit
 }
 
+export type AnswerFromUserPayload = {
+  to: string;
+  from: string;
+  answer: RTCSessionDescriptionInit
+}
+
 export type IceCandidatePayload = {
   to: string,
   from: string,
@@ -77,6 +83,10 @@ export type ServerMessage =
     type: "ICE_CANDIDATE_TO_USER";
     payload: IceCandidatePayload;
   }
+  | {
+    type: "ANSWER_FROM_USER";
+    payload: AnswerFromUserPayload
+  }
 export type ServerMessageType = ServerMessage["type"]
 export type ServerMessagePayload = ServerMessage["payload"]
 
@@ -88,8 +98,6 @@ export type ServerMessagePayload = ServerMessage["payload"]
 //                                                            //
 // -------------------------------------------------------------
 
-
-
 export interface SetUsernamePayload {
   username: string;
 }
@@ -99,6 +107,10 @@ export interface MessageReceivedPayload {
   target_username: string;
 }
 
+export interface OfferInitiatorPayload {
+  offer: RTCSessionDescriptionInit;
+  target_username: string;
+}
 
 export interface NewIceCandidatePayload {
   iceCandidate: RTCIceCandidate
@@ -112,6 +124,11 @@ export interface OfferPayload {
   offer: RTCSessionDescriptionInit
 }
 
+export interface AnswerPayload {
+  to: string;
+  from: string;
+  answer: RTCSessionDescriptionInit
+}
 
 
 export type ClientMessage =
@@ -134,4 +151,8 @@ export type ClientMessage =
   | {
     type: "OFFER";
     payload: OfferPayload
+  }
+  | {
+    type: "ANSWER"
+    payload: AnswerPayload
   }

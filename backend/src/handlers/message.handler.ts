@@ -3,7 +3,7 @@ import { parseRawWebSocketData } from "../utils/ws.utils.js";
 import { setUsername } from "./auth.handler.js";
 import type { CustomWebSocket } from "../types/websocket.types.js";
 import { getAllUsernamesHandler, messageReceivedHandler } from "./chat.handler.js";
-import { handleIceCandidate, handleIncomingOffer } from "./offer.handler.js";
+import { handleAnswer, handleIceCandidate, handleIncomingOffer } from "./offer.handler.js";
 
 export const onMessageHandler = (
   raw: WebSocket.RawData,
@@ -35,6 +35,9 @@ export const onMessageHandler = (
     case "NEW_ICE_CANDIDATE": {
       handleIceCandidate(ws, data.payload)
       break;
+    }
+    case "ANSWER": {
+      handleAnswer(ws, data.payload)
     }
   }
 };

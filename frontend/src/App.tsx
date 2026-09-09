@@ -17,7 +17,7 @@ function App() {
   })
 
   return (
-    <div className=" bg-fuchsia-800 w-screen h-screen grid grid-cols-3 grid-rows-2  ">
+    <div className=" bg-fuchsia-800 w-full h-full grid grid-cols-3 grid-rows-2  ">
       {/*<MediaStreamDemo />*/}
       {/*<ScreenShareDemo />*/}
       {/*<StreamFromOneElementToAnother />*/}

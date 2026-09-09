@@ -1,5 +1,5 @@
 import { ConnectionManagerInstance } from "../service/connectionManager.js";
-import type { CustomWebSocket, NewIceCandidatePayload, OfferPayload } from "../types/websocket.types.js";
+import type { AnswerPayload, CustomWebSocket, NewIceCandidatePayload, OfferPayload } from "../types/websocket.types.js";
 import { sendError, sendMessage } from "../utils/ws.utils.js";
 
 
@@ -41,6 +41,27 @@ export const handleIceCandidate = (ws: CustomWebSocket, payload: NewIceCandidate
             from, 
             to,
             iceCandidate,
+        }
+    })
+}
+
+export const handleAnswer = (ws: CustomWebSocket, payload: AnswerPayload) => {
+    const { answer , from , to } = payload
+
+    const targetUserWs = ConnectionManagerInstance.get(to)
+    if (!targetUserWs) {
+        sendError(ws, {
+            code: "USER_NOT_FOUND",
+            message:"cant find users socket"
+        })
+        return
+    }
+    sendMessage(targetUserWs , {
+        type: "ANSWER_FROM_USER",
+        payload: {
+            from, 
+            to,
+            answer,
         }
     })
 }

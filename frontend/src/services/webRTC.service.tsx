@@ -1,13 +1,8 @@
-// import { useUserMedia } from "@/hooks/useUserMedia"
 import { configuration } from "@/utils/stunServers"
 import { socketService } from "./websocket.service"
 import { eventBusInstance } from "@/learn/eventBus"
 import type { IceCandidatePayload } from "@/types/websocket.types"
-// type ModeType = {
-//     audio: boolean 
-//     video: boolean
-//     screenShare: boolean
-// }
+
 
 interface InitiateCallPayload {
     stream: MediaStream
@@ -15,17 +10,21 @@ interface InitiateCallPayload {
     myUsername: string
 }
 interface ReceiveCallPayload {
-    stream: MediaStream
     call_from: string,
     myUsername: string
-    remoteOffer: RTCSessionDescriptionInit   
+    remoteOffer: RTCSessionDescriptionInit
 }
 
+interface HandleIncomingAnswerPayload {
+    currUser: string,
+    to: string,
+    answer: RTCSessionDescriptionInit
+}
 class WebRTC {
 
     private pc: null | RTCPeerConnection = null
     private iceCandidatesBufferQueue : RTCIceCandidate[] = []
-
+    public remoteOffer: RTCSessionDescription | null =  null 
     constructor() {
         this.setupSignalingIncoming()
     }
@@ -45,9 +44,13 @@ class WebRTC {
             
             this.pc = new RTCPeerConnection(configuration)
             const { call_to, myUsername, stream } = payload
+
             
+            this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e, myUsername, call_to)
+            this.pc.ontrack = e => this.handleOntrack(e)
+
             for (const track of stream.getTracks()) {
-                this.pc.addTrack(track)
+                this.pc.addTrack(track ,stream)
             }
     
             const offer = await this.pc.createOffer()
@@ -61,10 +64,6 @@ class WebRTC {
                 }
             })
 
-            this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e, myUsername, call_to)
-            
-            this.pc.ontrack = e => this.handleOntrack(e)
-
         } catch (err) {
             console.error("error in initiating call: " , err)
         }
@@ -76,19 +75,65 @@ class WebRTC {
      */
     public async receiveCall(payload: ReceiveCallPayload) {
         try {
-
-            const { call_from , myUsername , remoteOffer , stream } = payload
+            const { call_from , myUsername , remoteOffer } = payload
             this.pc = new RTCPeerConnection(configuration)
+            this.pc.ontrack = e => this.handleOntrack(e)
             await this.pc.setRemoteDescription(remoteOffer)
-            await this.handleBufferedIceCandidates()
-            for (const track of stream.getTracks()) {
-                this.pc.addTrack(track)
+        } catch (err) {
+            console.log("error in receive call: " , err)
+        }
+    }
+
+    // function after initial exchange 
+
+    public async sendAnswer(payload: {
+        from: string,
+        to: string,
+        stream: MediaStream
+    }) {
+        try {
+            
+            const {from, to  , stream} = payload
+            if (!this.pc) {
+                throw new Error("no peer Connection found");
             }
 
-            this.pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e, myUsername , call_from)
-            this.pc.ontrack = e => this.handleOntrack(e)
-        } catch (err) {
+            this.pc.onicecandidate = e =>  this.handleOnIceCandidateEvent(e, from , to)
             
+            for (const track of stream.getTracks()) {
+                this.pc.addTrack(track , stream)
+            }
+            const answer = await this.pc.createAnswer() 
+            await this.pc.setLocalDescription(answer)
+            socketService.emit({
+                type: "ANSWER",
+                payload: {
+                    answer,
+                    from,
+                    to,
+                }
+            })
+            await this.handleBufferedIceCandidates()
+
+        } catch (err) {
+            console.log('error in sendAnswer: ',err)
+            
+        }
+    }
+    public async handleIncomingAnswer(payload: HandleIncomingAnswerPayload) {
+        try {
+            if (!this.pc) {
+                console.log("rtc connection not found, handle incoming answer...")
+                return;
+            }
+            const {answer , currUser ,to} = payload
+            await this.pc.setRemoteDescription(answer)
+            // this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e,currUser ,to)
+            // this.pc.ontrack = e => this.handleOntrack(e)
+            await this.handleBufferedIceCandidates()
+
+        } catch (err) {
+            console.log('error in handleIncomingAnswer: ',err)
         }
     }
 
@@ -99,7 +144,9 @@ class WebRTC {
             console.log("ice candidate added to the buffer queue")
             return 
         } 
-        await this.handleBufferedIceCandidates()
+        // await this.handleBufferedIceCandidates()
+        this.pc.addIceCandidate(payload.iceCandidate)
+        console.log("ice candidate added to the list")
     }
 
     private async handleBufferedIceCandidates() {

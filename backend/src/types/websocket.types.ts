@@ -1,10 +1,9 @@
 import type { WebSocket } from "ws";
+
 export interface CustomWebSocket extends WebSocket {
   username?: string;
   isAlive?: boolean;
 }
-
-
 
 // -------------------------------------------------------------
 //                                                            // 
@@ -13,12 +12,11 @@ export interface CustomWebSocket extends WebSocket {
 //                                                            //
 // -------------------------------------------------------------
 
-
 export interface MessageFromUserPayload {
   from_username: string;
   message: string;
 }
-
+  
 export interface MessageToAllClientsPayload {
   message: string;
   from_username?: string;
@@ -26,6 +24,7 @@ export interface MessageToAllClientsPayload {
 export interface ReturnAllActiveClientsPayload {
   clients: string[];
 }
+
 export type ErrorCode = 
   | "UNAUTHENTICATED"
   | "UNAUTORIZED"
@@ -42,10 +41,17 @@ export interface ErrorPayload {
   targetUser?: string
 }
 
+
 export type OfferFromUserPayload  = {
   to: string,
   from: string,
   offer: RTCSessionDescriptionInit
+}
+
+export type AnswerFromUserPayload = {
+  to: string;
+  from: string;
+  answer: RTCSessionDescriptionInit
 }
 
 export type IceCandidatePayload = {
@@ -53,7 +59,6 @@ export type IceCandidatePayload = {
   from: string,
   iceCandidate: RTCIceCandidate
 }
-
 export type ServerMessage =
   | {
     type: "ERROR";
@@ -78,10 +83,14 @@ export type ServerMessage =
   | {
     type: "OFFER_FROM_USER";
     payload: OfferFromUserPayload
-  } 
+  }
   | {
     type: "ICE_CANDIDATE_TO_USER";
     payload: IceCandidatePayload;
+  }
+  | {
+    type: "ANSWER_FROM_USER";
+    payload: AnswerFromUserPayload
   }
 export type ServerMessageType = ServerMessage["type"]
 export type ServerMessagePayload = ServerMessage["payload"]
@@ -120,6 +129,12 @@ export interface OfferPayload {
   offer: RTCSessionDescriptionInit
 }
 
+export interface AnswerPayload {
+  to: string;
+  from: string;
+  answer: RTCSessionDescriptionInit
+}
+
 
 export type ClientMessage =
   | {
@@ -141,4 +156,8 @@ export type ClientMessage =
   | {
     type: "OFFER";
     payload: OfferPayload
+  }
+  | {
+    type: "ANSWER"
+    payload: AnswerPayload
   }

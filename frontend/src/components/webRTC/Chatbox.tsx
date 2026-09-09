@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button"
 import { emitEvents } from "@/helper/EmitEvents"
 import { useEffect, useRef, useState } from "react"
 import { parseWebSocketResponse } from "@/utils/websocket.utils"
-import type { MessageFromUserPayload, ReturnAllActiveClientsPayload } from "@/types/websocket.types"
+import type { AnswerPayload, MessageFromUserPayload, OfferFromUserPayload, ReturnAllActiveClientsPayload } from "@/types/websocket.types"
 import { socketService as ws } from "@/services/websocket.service"
 import { eventBusInstance } from "@/learn/eventBus"
 import { webRTCInstance } from "@/services/webRTC.service"
@@ -24,17 +24,36 @@ export const Chatbox: React.FC = () => {
   const [message, setMessage] = useState('')
   const [inbox , setInbox] = useState<InboxType[]>([])
   const {  requestPermission , stopStream , stream , error: streamError  } = useUserMedia({video:true , audio:true})
-  
+  const [incomingCall, setIncomingCall] = useState<{
+    from: string,
+    ringing: boolean
+  }>({
+    from: "",
+    ringing: false
+  })
+
+  const videoRef = useRef<HTMLVideoElement | null>( null)
   useEffect(() => {
     
     const ubsubscribeHandleAllActiveClients = eventBusInstance.subscribe("ALL_ACTIVE_CLIENTS", handleGetAllActiveClients)
     const ubsubscribeToRegisterUsername = eventBusInstance.subscribe("MESSAGE_FROM_USER",  handleMessageFromUser)
     const ubsubscribeToUsernameTakenError = eventBusInstance.subscribe("ERROR:USERNAME_TAKEN" , handleUsernameTaken)
+    const ubsubscribeToOffer = eventBusInstance.subscribe("OFFER_FROM_USER", handleIncomingOffer)
+    const unsubscribeToAnswer = eventBusInstance.subscribe("ANSWER_FROM_USER" , handleAnswer)
+
+    webRTCInstance.setOnRemoteStream((stream) => {
+      if (!videoRef.current || !stream) {
+        return
+      }
+      videoRef.current.srcObject = stream
+    })
 
     return () => {
       ubsubscribeHandleAllActiveClients()
       ubsubscribeToRegisterUsername()
       ubsubscribeToUsernameTakenError()
+      ubsubscribeToOffer()
+      unsubscribeToAnswer()
     }
   } , [])
 
@@ -48,6 +67,28 @@ export const Chatbox: React.FC = () => {
   }
 
 
+  const handleAnswer = async (payload: AnswerPayload) => {
+    const { answer, from, to } = payload
+    await webRTCInstance.handleIncomingAnswer({
+      currUser: to,
+      to: from,
+      answer:answer
+    })
+  }
+
+  // todo: handle the calling logic
+  const handleIncomingOffer = async (payload:OfferFromUserPayload) => {
+    const { from , offer , to} = payload
+    await webRTCInstance.receiveCall({
+      call_from: from,
+      myUsername: to, 
+      remoteOffer: offer,
+    })
+    setIncomingCall({
+      from: from,
+      ringing: true
+    })
+  }
   const registerUsername = (username: string) => {
     setError(null)
     if (username === '') {
@@ -91,7 +132,10 @@ export const Chatbox: React.FC = () => {
       console.log('stream error: ', streamError)
       return
     }
-
+    if (!currUsername) {
+      console.log("current username does not exist")
+      return 
+    }
     webRTCInstance.initiateCall({stream:streamRes ,call_to: call_to_username , myUsername:currUsername })
   }
 
@@ -110,6 +154,41 @@ export const Chatbox: React.FC = () => {
 
   return (
     <div className="flex flex-col">
+      <div className="border-2">
+        <h1 className="text-xl text-white border-2 p-2 m-2 "> Incoming calls </h1>
+        <div>
+          {incomingCall.ringing ?
+            (<div>
+              <p className="text-lg p-2 m-2 text-shadow-amber-400">incoming call form { incomingCall.from } </p>
+              <Button onClick={async () => {
+                const streamRes = await requestPermission()
+                if (streamRes === null) {
+                  console.log('stream error: ', streamError)
+                  return
+                }
+                webRTCInstance.sendAnswer({
+                  from: currUsername,
+                  to: incomingCall.from,
+                  stream: streamRes
+                })
+              }}>
+                Accept 
+              </Button>
+              <Button onClick={() => {
+                setIncomingCall({
+                  from: "",
+                  ringing: false
+                })
+                console.log("handle call rejected here, send emit to the caller")
+              }}>
+                Reject
+              </Button> 
+            </div>) :
+            (<div>
+              No incoming calls
+            </div>)}
+        </div>
+      </div>
       <div className="flex flex-row">
         <input
           onChange={(e) => {
@@ -189,6 +268,11 @@ export const Chatbox: React.FC = () => {
           )
         }
       </div>
+      <div>
+        hello world
+        <video ref={videoRef} autoPlay playsInline className="border-2 w-full h-full" />
+      </div>
+      
     </div>
   )
 }
