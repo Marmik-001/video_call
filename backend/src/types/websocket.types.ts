@@ -63,6 +63,10 @@ export type CallRejectedByUserPayload = {
   to: string,
   from: string
 }
+export type CallEndedPayload = {
+  from: string,
+  to: string
+}
 export type ServerMessage =
   | {
     type: "ERROR";
@@ -99,6 +103,10 @@ export type ServerMessage =
   | {
     type: "CALL_REJECTED_BY_USER";
     payload: CallRejectedByUserPayload;
+  }
+  | {
+    type: "CALL_ENDED",
+    payload: CallEndedPayload;
   }
 export type ServerMessageType = ServerMessage["type"]
 export type ServerMessagePayload = ServerMessage["payload"]
@@ -176,4 +184,8 @@ export type ClientMessage =
   | {
     type: "REJECTED"
     payload: RejectedPayload
+  }
+  | {
+    type: "CALL_ENDED"
+    payload: CallEndedPayload
   }

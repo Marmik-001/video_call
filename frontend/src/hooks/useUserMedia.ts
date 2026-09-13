@@ -11,12 +11,12 @@ interface UseUserMediaReturn {
   error: Error | null;
   isLoading: boolean;
   requestPermission: () => Promise<MediaStream | null>;
-  stopStream : () => void
+  stopStream: () => void
 }
 
 export const useUserMedia = (
-  constraints : UseUserMediaOptions = {video:true , audio:true}
-):UseUserMediaReturn => {
+  constraints: UseUserMediaOptions = { video: true, audio: true }
+): UseUserMediaReturn => {
 
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [error, setError] = useState<Error | null>(null)
@@ -37,7 +37,7 @@ export const useUserMedia = (
     setIsLoading(true);
     setError(null);
 
-    if (!navigator.mediaDevices?.getUserMedia(constraints)) {
+    if (!navigator.mediaDevices?.getUserMedia) {
       const err = new Error("media devices api not found in this browser")
       setError(err)
       setIsLoading(false)
@@ -48,23 +48,23 @@ export const useUserMedia = (
       const userStream = await navigator.mediaDevices.getUserMedia(constraints)
       setStream(userStream)
       streamRef.current = userStream
-        return userStream;
+      return userStream;
     } catch (e) {
       const mediaError = e instanceof Error ? e : new Error('failed to access media devices')
       setError(mediaError)
       return null
     } finally {
-      
+
       setIsLoading(false);
     }
-    
+
   }, [constraints])
 
   useEffect(() => {
     return () => {
       stopStream();
     }
-  },  [stopStream])
-  
-  return {stream , error, isLoading , requestPermission , stopStream}
+  }, [stopStream])
+
+  return { stream, error, isLoading, requestPermission, stopStream }
 }

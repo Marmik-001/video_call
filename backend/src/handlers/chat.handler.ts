@@ -23,7 +23,7 @@ export const messageReceivedHandler = (
         },
       };
       sendMessage(targetWS, sendData);
-    } 
+    }
   }
 };
 
@@ -32,7 +32,7 @@ export const getAllUsernamesHandler = (ws: CustomWebSocket) => {
   if (!ws.username) {
     const authErr: ErrorPayload = {
       code: "UNAUTHENTICATED",
-      message: "username not found", 
+      message: "username not found",
     }
     sendError(ws, authErr)
     return
