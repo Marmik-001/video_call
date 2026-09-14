@@ -4,6 +4,7 @@
 // import { StreamFromOneElementToAnother } from "./components/media/StreamFromOneElementToAnother";
 import { TrialWebRTC } from "./components/webRTC/TrialWebRTC";
 import { Chatbox } from "./components/webRTC/Chatbox";
+import Layout from "./components/webRTC/Layout";
 import { socketService } from "./services/websocket.service";
 import { useEffect } from "react";
 // import Event_one from "./components/events/event_one";
@@ -13,7 +14,7 @@ function App() {
 
   useEffect(() => {
     socketService.connect('http://localhost:8080')
-    
+
   })
 
   return (
@@ -24,9 +25,10 @@ function App() {
       {/* <Event_one />
       <Event_two />
       <Event_three /> */}
-      
+      <Layout />
+
       {/* <TrialWebRTC /> */}
-      <Chatbox />      
+      <Chatbox />
     </div>
   );
 }
