@@ -10,18 +10,24 @@ const UserVideo = () => {
 
   useEffect(() => {
     webRTCInstance.setOnRemoteStream((stream) => {
-      if (!peerVideoRef.current || !stream) {
-        return
-      }
-      peerVideoRef.current.srcObject = stream
-    })
+      console.log("UserVideo: received stream in component", stream.id);
+      if (!peerVideoRef.current) return;
+
+      peerVideoRef.current.srcObject = stream;
+
+      // Force video playback to bypass browser autoplay restrictions
+      peerVideoRef.current
+        .play()
+        .then(() => console.log("Remote video playing successfully"))
+        .catch((err) => console.error("Autoplay prevented:", err));
+    });
 
     return () => {
-      webRTCInstance.setOnRemoteStream(() => { })
       if (peerVideoRef.current) {
-        peerVideoRef.current = null
+        peerVideoRef.current.srcObject = null;
       }
     }
+
   }, [])
   return (
     <div className="w-full h-full bg-black border-2 border-white p-2 m-2">

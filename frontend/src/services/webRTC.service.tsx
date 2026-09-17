@@ -208,16 +208,22 @@ class WebRTC {
   }
 
   private onRemoteStreamReceived: ((stream: MediaStream) => void) | null = null
+  private remoteStream: MediaStream | null = null
 
   public setOnRemoteStream(callback: (stream: MediaStream) => void) {
     this.onRemoteStreamReceived = callback
+    if (this.remoteStream) {
+      console.log("use the saved stream")
+      callback(this.remoteStream)
+    }
   }
 
   private handleOntrack(e: RTCTrackEvent) {
     if (e.streams && e.streams[0]) {
       // this shit is nothing but just checking if onremotestreamreceived is null or a function, if its a function, we pass in the streams[0] as argument and call the function
       console.log("stream found...")
-      this.onRemoteStreamReceived?.(e.streams[0])
+      this.remoteStream = e.streams[0]
+      this.onRemoteStreamReceived?.(this.remoteStream)
     }
   }
   private handleOnIceCandidateEvent(e: RTCPeerConnectionIceEvent, from: string, to: string) {
