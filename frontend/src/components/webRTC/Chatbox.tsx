@@ -222,8 +222,7 @@ export const Chatbox: React.FC = () => {
             setCurrUsername(e.target.value)
             usernameRef.current = e.target.value
           }}
-          value={currUsername
-          }
+          value={currUsername}
           className="bg-black, text-white w-100 border-2 border-cyan-700"
         />
 

@@ -2,8 +2,7 @@
 // import { MediaStreamDemo } from "./components/media/MediaStreamDemo";
 // import { ScreenShareDemo } from "./components/media/ScreenShareDemo";
 // import { StreamFromOneElementToAnother } from "./components/media/StreamFromOneElementToAnother";
-import { TrialWebRTC } from "./components/webRTC/TrialWebRTC";
-import { Chatbox } from "./components/webRTC/Chatbox";
+// import { Chatbox } from "./components/webRTC/Chatbox";
 import Layout from "./components/webRTC/Layout";
 import { socketService } from "./services/websocket.service";
 import { useEffect } from "react";
@@ -28,7 +27,7 @@ function App() {
       <Layout />
 
       {/* <TrialWebRTC /> */}
-      <Chatbox />
+      {/* <Chatbox /> */}
     </div>
   );
 }

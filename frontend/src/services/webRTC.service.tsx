@@ -1,7 +1,7 @@
 import { configuration } from "@/utils/stunServers"
 import { socketService } from "./websocket.service"
 import { eventBusInstance } from "@/learn/eventBus"
-import type { CallEndedPayload, CallRejectedByUserPayload, IceCandidatePayload, OfferFromUserPayload } from "@/types/websocket.types"
+import type { AnswerFromUserPayload, CallEndedPayload, CallRejectedByUserPayload, IceCandidatePayload, OfferFromUserPayload } from "@/types/websocket.types"
 
 
 interface InitiateCallPayload {
@@ -10,11 +10,6 @@ interface InitiateCallPayload {
   myUsername: string
 }
 
-interface HandleIncomingAnswerPayload {
-  currUser: string,
-  to: string,
-  answer: RTCSessionDescriptionInit
-}
 class WebRTC {
 
   private pc: null | RTCPeerConnection = null
@@ -29,6 +24,7 @@ class WebRTC {
     eventBusInstance.subscribe("CALL_REJECTED_BY_USER", (payload: CallRejectedByUserPayload) => this.handleCallRejectedByUser(payload))
     eventBusInstance.subscribe("CALL_ENDED", (payload: CallEndedPayload) => this.endCall())
     eventBusInstance.subscribe("OFFER_FROM_USER", (payload: OfferFromUserPayload) => this.receiveCall(payload))
+    eventBusInstance.subscribe("ANSWER_FROM_USER", (payload: AnswerFromUserPayload) => this.handleIncomingAnswer(payload))
   }
 
   private handleCallRejectedByUser(payload: CallRejectedByUserPayload) {
@@ -56,7 +52,13 @@ class WebRTC {
 
       this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e, myUsername, call_to)
       this.pc.ontrack = e => this.handleOntrack(e)
+      this.pc.onconnectionstatechange = () => {
+        console.log("🔥 Connection State:", this.pc?.connectionState);
+      };
 
+      this.pc.oniceconnectionstatechange = () => {
+        console.log("❄️ ICE Connection State:", this.pc?.iceConnectionState);
+      };
       for (const track of stream.getTracks()) {
         this.pc.addTrack(track, stream)
       }
@@ -169,13 +171,13 @@ class WebRTC {
 
     }
   }
-  public async handleIncomingAnswer(payload: HandleIncomingAnswerPayload) {
+  public async handleIncomingAnswer(payload: AnswerFromUserPayload) {
     try {
       if (!this.pc) {
         console.log("rtc connection not found, handle incoming answer...")
         return;
       }
-      const { answer, currUser, to } = payload
+      const { answer } = payload
       await this.pc.setRemoteDescription(answer)
       // this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e,currUser ,to)
       // this.pc.ontrack = e => this.handleOntrack(e)
