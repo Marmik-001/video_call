@@ -11,8 +11,11 @@ export const onMessageHandler = (
 ) => {
   const data = parseRawWebSocketData(raw);
   if (!data) return;
-  console.log("messege received from the client", data);
-  console.log("res type: ", data.type);
+  // console.log("res type: ", data.type);
+  if (data.type !== "NEW_ICE_CANDIDATE") {
+    console.log("res type:", data.type)
+    console.log("messege received from the client", data);
+  }
 
   switch (data.type) {
     case "SET_USERNAME": {

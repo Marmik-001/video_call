@@ -1,19 +1,13 @@
 import { configuration } from "@/utils/stunServers"
 import { socketService } from "./websocket.service"
 import { eventBusInstance } from "@/learn/eventBus"
-import type { CallEndedPayload, CallRejectedByUserPayload, IceCandidatePayload } from "@/types/websocket.types"
-import { preload } from "react-dom"
+import type { CallEndedPayload, CallRejectedByUserPayload, IceCandidatePayload, OfferFromUserPayload } from "@/types/websocket.types"
 
 
 interface InitiateCallPayload {
   stream: MediaStream
   call_to: string,
   myUsername: string
-}
-interface ReceiveCallPayload {
-  call_from: string,
-  myUsername: string
-  remoteOffer: RTCSessionDescriptionInit
 }
 
 interface HandleIncomingAnswerPayload {
@@ -25,7 +19,7 @@ class WebRTC {
 
   private pc: null | RTCPeerConnection = null
   private iceCandidatesBufferQueue: RTCIceCandidate[] = []
-  public remoteOffer: RTCSessionDescription | null = null
+  public remoteOffer: RTCSessionDescriptionInit | null = null
   constructor() {
     this.setupSignalingIncoming()
   }
@@ -34,6 +28,7 @@ class WebRTC {
     eventBusInstance.subscribe("ICE_CANDIDATE_TO_USER", (payload: IceCandidatePayload) => this.handleIncomingIceCandidates(payload))
     eventBusInstance.subscribe("CALL_REJECTED_BY_USER", (payload: CallRejectedByUserPayload) => this.handleCallRejectedByUser(payload))
     eventBusInstance.subscribe("CALL_ENDED", (payload: CallEndedPayload) => this.endCall())
+    eventBusInstance.subscribe("OFFER_FROM_USER", (payload: OfferFromUserPayload) => this.receiveCall(payload))
   }
 
   private handleCallRejectedByUser(payload: CallRejectedByUserPayload) {
@@ -86,12 +81,13 @@ class WebRTC {
   /**
    * receiveCall
    */
-  public async receiveCall(payload: ReceiveCallPayload) {
+  public async receiveCall(payload: OfferFromUserPayload) {
     try {
-      const { call_from, myUsername, remoteOffer } = payload
+      const { to, from, offer } = payload
       this.pc = new RTCPeerConnection(configuration)
       this.pc.ontrack = e => this.handleOntrack(e)
-      await this.pc.setRemoteDescription(remoteOffer)
+      this.remoteOffer = offer
+      await this.pc.setRemoteDescription(offer)
     } catch (err) {
       console.log("error in receive call: ", err)
     }
@@ -103,7 +99,7 @@ class WebRTC {
       this.pc?.close()
       this.pc = null
       this.iceCandidatesBufferQueue = []
-      console.log("call ended endCall function called...")
+      console.log("call ended endCall function called... add a check here if the corret user sent the end call request and not a fake user")
     } catch (err) {
       console.log("Error in end Call: ", err)
     }
@@ -144,6 +140,11 @@ class WebRTC {
       const { from, to, stream } = payload
       if (!this.pc) {
         throw new Error("no peer Connection found");
+      }
+      if (!from || !to) {
+        console.log("arguemnets not passed, from and to in sendAnswer func...")
+        throw new Error("No arguemnets found")
+
       }
 
       this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e, from, to)

@@ -10,6 +10,7 @@ interface CallDetailsType {
 
 interface CallContextType {
   callDetails: CallDetailsType
+  callDetailsRef: React.RefObject<CallDetailsType>
   setIdle: () => void;
   setOngoing: (payload: { caller: string, receiver: string }) => void;
   setIncoming: (caller: string) => void;
@@ -77,7 +78,7 @@ export const CallContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }
   return (
 
-    <CallContext.Provider value={{ callDetails: details, setIdle, setIncoming, setOngoing, setOutgoing }}> {children}</CallContext.Provider>
+    <CallContext.Provider value={{ callDetailsRef: callDetailsRef, callDetails: details, setIdle, setIncoming, setOngoing, setOutgoing }}> {children}</CallContext.Provider>
   )
 }
 export const useCallStatus = () => {

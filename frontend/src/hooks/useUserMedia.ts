@@ -51,6 +51,7 @@ export const useUserMedia = (
       return userStream;
     } catch (e) {
       const mediaError = e instanceof Error ? e : new Error('failed to access media devices')
+      console.log("error in request permission: ", mediaError)
       setError(mediaError)
       return null
     } finally {

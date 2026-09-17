@@ -7,6 +7,7 @@ todo:
 fix the call end functionality    [done] [few bugs and code repeatation]
 add call ended and rejected emits for signaling server [done]
 
+bug: call ended function, backend frontend both side need to handle the call ended properly, right now there are not checks, no clear who is cutting the call functions
 
 second todo list: 
 refactor 

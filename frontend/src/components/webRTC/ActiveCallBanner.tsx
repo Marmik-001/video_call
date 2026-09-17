@@ -1,35 +1,23 @@
 import { eventBusInstance } from "@/learn/eventBus"
 import { webRTCInstance } from "@/services/webRTC.service"
 import type { OfferFromUserPayload } from "@/types/websocket.types"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { Button } from "../ui/button"
 import { useUserMedia } from "@/hooks/useUserMedia"
 import { useUser } from "@/context/UserContext"
 import { useCallStatus } from "@/context/CallContext"
 
-interface IncomingCallNotificationOptions {
-
-}
-interface IncomingCallInterface {
-  status: "active" | "ringing" | "idle",
-  caller: string | null,
-
-}
-const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
+const IncomingCallNotification = () => {
 
 
-  const { currentUsernameRef } = useUser()
-  const { callDetails, setIdle, setIncoming, setOngoing, setOutgoing } = useCallStatus()
+  const { currentUser, currentUsernameRef } = useUser()
+  const { callDetailsRef, callDetails, setIdle, setIncoming, setOngoing, setOutgoing } = useCallStatus()
   const { error, requestPermission, stopStream, stream } = useUserMedia({ audio: true, video: true })
 
   const handleIncomingOffer = async (payload: OfferFromUserPayload) => {
-    const { from, offer, to } = payload
-    await webRTCInstance.receiveCall({
-      call_from: from,
-      myUsername: to,
-      remoteOffer: offer,
-    })
+    const { from } = payload
     setIncoming(from)
+    console.log("set incoming here... callcontext function")
   }
 
   const handleCallAccept = async () => {
@@ -38,14 +26,19 @@ const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
       console.log('stream error: ', error)
       return
     }
-    if (!incomingCall.caller) {
-      console.error("no caller name found in handleCallAccept")
-      return;
+    if (!callDetailsRef.current.caller) {
+      console.log("no caller found in the calldetails ref, cant accept...")
+      return
     }
+    console.log("this is whate active banner is sending to send answer: calldetailsref caller:", callDetailsRef.current.caller, " current username:  ", currentUsernameRef, " username without ref: ", currentUser)
     webRTCInstance.sendAnswer({
       from: currentUsernameRef.current,
-      to: incomingCall.caller,
+      to: callDetailsRef.current.caller,
       stream: streamRes
+    })
+    setOngoing({
+      caller: callDetailsRef.current.caller,
+      receiver: currentUsernameRef.current
     })
   }
   const handleHoldCall = async () => {
@@ -53,6 +46,7 @@ const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
   }
   const handleEndCall = async () => {
     stopStream()
+    console.log("edit end call bug here too....")
     webRTCInstance.endCall()
   }
   const handleCallReject = async () => {
@@ -61,23 +55,19 @@ const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
       console.log("handle username removed in between error here...")
       return;
     }
-    if (!incomingCall.caller) {
+    if (!callDetailsRef.current.caller) {
       console.error("no caller name found in handleCallAccept")
       return;
     }
     webRTCInstance.rejectCall({
       from: currentUsernameRef.current,
-      to: incomingCall.caller,
-    })
-    setIncomingCall({
-      caller: "",
-      status: "idle"
+      to: callDetailsRef.current.caller,
     })
     console.log("handle call rejected here, send emit to the caller")
   }
 
   const handleCallRejectedByUser = async () => {
-    setIncomingCall({ status: "idle", caller: "" })
+    setIdle()
   }
   useEffect(() => {
 
@@ -94,25 +84,47 @@ const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
   return (
     <div className="border-2 bg-blue-400 border-blue-600 col-span-3 ">
       {
-        incomingCall.status === "ringing" && (
+        callDetails.status === "IDLE" && (
           <div>
-            <p>Incoming CALL from {incomingCall.caller}</p>
+            <p>NO ON GOING CALL</p>
+          </div>
+
+        )
+      }
+      {
+        callDetails.status === "OUTGOING" && (
+          <div>
+            <p>calling: {callDetails.receiver}</p>
+          </ div>
+        )
+      }
+      {
+        callDetails.status === "INCOMING" && (
+          <div>
+            <p>Incoming Call: {callDetails.caller}</p>
             <Button onClick={handleCallAccept}>
               Accept
             </Button>
             <Button onClick={handleCallReject}>
               Reject
-            </Button>
-
+            </ Button>
           </div>
         )
       }
       {
-        incomingCall.status === 'active' && (
+        callDetails.status === "ONGOING" && (
           <div>
-            <p>On Call with {incomingCall.caller}</p>
-            <Button onClick={handleHoldCall}>Hold</Button>
-            <Button onClick={handleEndCall}>End Call</Button>
+            <div>
+
+              {
+                currentUser === callDetails.caller ? (<p>
+                  On Call With {callDetails.receiver}
+                </p>) : (<p>
+                  On Call With {callDetails.caller}
+                </p>)
+              }
+            </div>
+            <Button onClick={handleEndCall}> End Call </Button>
           </div>
         )
       }
@@ -120,3 +132,5 @@ const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
   )
 }
 export default IncomingCallNotification
+
+
