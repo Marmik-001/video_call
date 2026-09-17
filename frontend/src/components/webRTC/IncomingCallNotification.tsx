@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { Button } from "../ui/button"
 import { useUserMedia } from "@/hooks/useUserMedia"
 import { useUser } from "@/context/UserContext"
+import { useCallStatus } from "@/context/CallContext"
 
 interface IncomingCallNotificationOptions {
 
@@ -18,11 +19,8 @@ const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
 
 
   const { currentUsernameRef } = useUser()
+  const { callDetails, setIdle, setIncoming, setOngoing, setOutgoing } = useCallStatus()
   const { error, requestPermission, stopStream, stream } = useUserMedia({ audio: true, video: true })
-  const [incomingCall, setIncomingCall] = useState<IncomingCallInterface>({
-    status: "idle",
-    caller: null
-  })
 
   const handleIncomingOffer = async (payload: OfferFromUserPayload) => {
     const { from, offer, to } = payload
@@ -31,10 +29,7 @@ const IncomingCallNotification = (payload: IncomingCallNotificationOptions) => {
       myUsername: to,
       remoteOffer: offer,
     })
-    setIncomingCall({
-      caller: from,
-      status: "ringing"
-    })
+    setIncoming(from)
   }
 
   const handleCallAccept = async () => {
