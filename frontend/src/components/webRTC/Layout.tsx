@@ -4,6 +4,7 @@ import Register from "./Register"
 import { CallContextProvider } from "@/context/CallContext"
 import UserList from "./UserList"
 import UserVideo from "./UserVideo"
+import ConnectionStats from "./ConnectionStats"
 
 
 
@@ -19,6 +20,7 @@ const Layout = () => {
           <Register />
           <UserList />
           <UserVideo />
+          <ConnectionStats />
         </div>
       </CallContextProvider>
     </ UseUserProvider>

@@ -241,6 +241,24 @@ class WebRTC {
       }
     })
   }
+
+  public async peerConnectionStats(): Promise<RTCStatsReport | null> {
+    const stats = await this.pc?.getStats()
+    console.log("stats: ", stats)
+    if (!stats) {
+      return null;
+    }
+
+    stats.forEach((report) => {
+      if (report.type === "inbound-rtp") {
+        // Log the frame rate
+        console.log("FPS: ", report.framesPerSecond);
+        console.log("jitter", report.jitter);
+
+      }
+    });
+    return stats;
+  }
 }
 
 export const webRTCInstance = new WebRTC()
