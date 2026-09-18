@@ -25,6 +25,7 @@ const UserVideo = () => {
     return () => {
       if (peerVideoRef.current) {
         peerVideoRef.current.srcObject = null;
+        peerVideoRef.current = null;
       }
     }
 

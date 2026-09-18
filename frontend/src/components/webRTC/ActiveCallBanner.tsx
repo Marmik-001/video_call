@@ -18,7 +18,6 @@ const ActiveCallBanner = () => {
   const handleIncomingOffer = async (payload: OfferFromUserPayload) => {
     const { from } = payload
     setIncoming(from)
-    console.log("set incoming here... callcontext function")
   }
 
   const handleCallAccept = async () => {
@@ -31,7 +30,6 @@ const ActiveCallBanner = () => {
       console.log("no caller found in the calldetails ref, cant accept...")
       return
     }
-    console.log("this is whate active banner is sending to send answer: calldetailsref caller:", callDetailsRef.current.caller, " current username:  ", currentUsernameRef, " username without ref: ", currentUser)
     webRTCInstance.sendAnswer({
       from: currentUsernameRef.current,
       to: callDetailsRef.current.caller,
@@ -51,16 +49,8 @@ const ActiveCallBanner = () => {
       console.error("did not find the other party to cut the call...")
       return
     }
-    socketService.emit({
-      type: "CALL_ENDED",
-      payload: {
-        from: currentUser,
-        to: sendEventTo
-      }
-    })
+    webRTCInstance.handleCallEnd({ from: currentUser, to: sendEventTo })
     stopStream()
-    console.log("edit end call bug here too....")
-    webRTCInstance.endCall()
     setIdle()
   }
   const handleCallReject = async () => {

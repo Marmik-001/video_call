@@ -113,6 +113,14 @@ export const handleCallEnded = (ws: CustomWebSocket, payload: CallEndedPayload) 
     })
     return;
   }
+  if (from !== ws.username) {
+    sendError(ws, {
+      code: "WRONG_USER",
+      message: "USERNAME ATTACHED TO THE REQUEST IS NOT THE ONE ENDING THE CALL"
+    })
+    console.log("USERNAME MISMATCH DURING CALL END")
+    return;
+  }
   sendMessage(targetUserWs, {
     type: "CALL_ENDED",
     payload: {

@@ -19,7 +19,7 @@ const UserList = () => {
   const { currentUser } = useUser()
 
   const { setOutgoing } = useCallStatus()
-  const { requestPermission, error } = useUserMedia()
+  const { requestPermission, error, stopStream } = useUserMedia()
   const handleGetAllUsers = () => {
     socketService.emit({
       type: "GET_ALL_USERNAMES",
@@ -58,11 +58,12 @@ const UserList = () => {
 
     const ubsubscribeToUsernameList = eventBusInstance.subscribe("ALL_ACTIVE_CLIENTS", handleActiveUsersList)
     const unsubscribeToUnauthenticated = eventBusInstance.subscribe("ERROR:UNAUTHENTICATED", handleUnauthentication)
-
+    const ubsubscribeToCallRejectedByUser = eventBusInstance.subscribe("CALL_REJECTED_BY_USER", () => { stopStream() })
 
     return () => {
       ubsubscribeToUsernameList()
       unsubscribeToUnauthenticated()
+      ubsubscribeToCallRejectedByUser()
     }
   })
 

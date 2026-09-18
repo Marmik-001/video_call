@@ -37,6 +37,7 @@ const ConnectionStats = () => {
       return;
     }
     clearInterval(statsIntervalRef.current)
+    statsIntervalRef.current = null
     console.log("interval cleared")
   }
 

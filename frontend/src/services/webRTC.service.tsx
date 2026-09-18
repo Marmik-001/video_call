@@ -2,6 +2,7 @@ import { configuration } from "@/utils/stunServers"
 import { socketService } from "./websocket.service"
 import { eventBusInstance } from "@/learn/eventBus"
 import type { AnswerFromUserPayload, CallEndedPayload, CallRejectedByUserPayload, IceCandidatePayload, OfferFromUserPayload } from "@/types/websocket.types"
+import { iceCandidatesInstance } from "@/components/webRTC/iceCandidates.service"
 
 
 interface InitiateCallPayload {
@@ -22,7 +23,7 @@ class WebRTC {
   private setupSignalingIncoming() {
     eventBusInstance.subscribe("ICE_CANDIDATE_TO_USER", (payload: IceCandidatePayload) => this.handleIncomingIceCandidates(payload))
     eventBusInstance.subscribe("CALL_REJECTED_BY_USER", (payload: CallRejectedByUserPayload) => this.handleCallRejectedByUser(payload))
-    eventBusInstance.subscribe("CALL_ENDED", (payload: CallEndedPayload) => this.endCall())
+    eventBusInstance.subscribe("CALL_ENDED", (payload: CallEndedPayload) => this.endCall(payload))
     eventBusInstance.subscribe("OFFER_FROM_USER", (payload: OfferFromUserPayload) => this.receiveCall(payload))
     eventBusInstance.subscribe("ANSWER_FROM_USER", (payload: AnswerFromUserPayload) => this.handleIncomingAnswer(payload))
   }
@@ -36,6 +37,7 @@ class WebRTC {
     this.iceCandidatesBufferQueue = []
     this.onRemoteStreamReceived = null
     console.log("cleared variables")
+
   }
   /**
    * initiateCall
@@ -95,13 +97,13 @@ class WebRTC {
     }
   }
 
-  public endCall() {
+  public endCall(payload: CallEndedPayload) {
     try {
       this.pc?.getSenders().forEach((sender) => sender.track?.stop())
       this.pc?.close()
       this.pc = null
       this.iceCandidatesBufferQueue = []
-      console.log("call ended endCall function called... add a check here if the corret user sent the end call request and not a fake user")
+      this.remoteStream = null
     } catch (err) {
       console.log("Error in end Call: ", err)
     }
@@ -190,13 +192,20 @@ class WebRTC {
 
   public async handleIncomingIceCandidates(payload: IceCandidatePayload) {
 
+
+    const { from, iceCandidate, to } = payload
+    if (!iceCandidate) {
+      console.error("no ice candidate received in this payload")
+      return;
+    }
+    iceCandidatesInstance.parseIceCandidates(iceCandidate)
     if (!this.pc?.currentRemoteDescription) {
-      this.iceCandidatesBufferQueue.push(payload.iceCandidate)
+      this.iceCandidatesBufferQueue.push(iceCandidate)
       console.log("ice candidate added to the buffer queue")
       return
     }
     // await this.handleBufferedIceCandidates()
-    this.pc.addIceCandidate(payload.iceCandidate)
+    this.pc.addIceCandidate(iceCandidate)
     console.log("ice candidate added to the list")
   }
 
@@ -232,6 +241,7 @@ class WebRTC {
       console.log("ice candidate not in the event")
       return;
     }
+    iceCandidatesInstance.parseIceCandidates(e.candidate)
     socketService.emit({
       type: "NEW_ICE_CANDIDATE",
       payload: {
@@ -240,6 +250,22 @@ class WebRTC {
         iceCandidate: e.candidate
       }
     })
+  }
+  public async handleCallEnd(payload: CallEndedPayload) {
+
+    const { from, to } = payload
+    if (!from || !to) {
+      console.error("ARGUEMNTS NOT PASSED CORRECTLY")
+      return;
+    }
+    socketService.emit({
+      type: "CALL_ENDED", payload: {
+        from: from,
+        to: to
+      }
+    })
+    this.endCall({ from: from, to: to })
+    console.log("sending the call end request to remote peer")
   }
 
   public async peerConnectionStats(): Promise<RTCStatsReport | null> {
@@ -250,12 +276,32 @@ class WebRTC {
     }
 
     stats.forEach((report) => {
-      if (report.type === "inbound-rtp") {
-        // Log the frame rate
-        console.log("FPS: ", report.framesPerSecond);
-        console.log("jitter", report.jitter);
+      console.log("report type: ", report.type)
 
+      switch (report.type) {
+        case "inbound-rtp": {
+          const r = report as RTCInboundRtpStreamStats
+          console.log("report type is inbound-rtp")
+          break;
+        }
+        case "outbound-rtp": {
+          const r = report as RTCOutboundRtpStreamStats
+          console.log("report type is outbound-rtp")
+          break;
+        }
+        default: {
+          console.log("rest of the types...")
+          break;
+        }
       }
+      // if (report.type === "inbound-rtp") {
+      //   const r = report as RTCInboundRtpStreamStats
+      //   console.log("r. : ", r.type, " jitter: ", r.jitter, "bytesReceived : ", r.bytesReceived)
+      //   // Log the frame rate
+      //   console.log("FPS: ", report.framesPerSecond, typeof report.framesPerSecond);
+      //   console.log("jitter", report.jitter, typeof report.jitter);
+      //
+      // }
     });
     return stats;
   }
