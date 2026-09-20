@@ -191,7 +191,7 @@ class WebRTC {
   public async handleIncomingIceCandidates(payload: IceCandidatePayload) {
 
 
-    const { from, iceCandidate, to } = payload
+    const { ceCandidate } = payload
     if (!iceCandidate) {
       console.error("no ice candidate received in this payload")
       return;
@@ -292,14 +292,6 @@ class WebRTC {
           break;
         }
       }
-      // if (report.type === "inbound-rtp") {
-      //   const r = report as RTCInboundRtpStreamStats
-      //   console.log("r. : ", r.type, " jitter: ", r.jitter, "bytesReceived : ", r.bytesReceived)
-      //   // Log the frame rate
-      //   console.log("FPS: ", report.framesPerSecond, typeof report.framesPerSecond);
-      //   console.log("jitter", report.jitter, typeof report.jitter);
-      //
-      // }
     });
     return stats;
   }

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import { Button } from "../ui/button"
 import { webRTCInstance } from "@/services/webRTC.service"
+import ConnectionTypeStats from "./stats/ConnectionTypeStats"
 
 
 interface StatsType {
@@ -46,6 +47,7 @@ const ConnectionStats = () => {
       hello world
       <Button onClick={startStatsReport}> Get Stats </ Button>
       <Button onClick={stopStatsReport}> Stop Stats </Button>
+      <ConnectionTypeStats />
       {
 
 
