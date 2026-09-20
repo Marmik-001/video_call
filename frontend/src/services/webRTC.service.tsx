@@ -87,7 +87,7 @@ class WebRTC {
    */
   public async receiveCall(payload: OfferFromUserPayload) {
     try {
-      const { to, from, offer } = payload
+      const { offer } = payload
       this.pc = new RTCPeerConnection(configuration)
       this.pc.ontrack = e => this.handleOntrack(e)
       this.remoteOffer = offer
@@ -181,8 +181,6 @@ class WebRTC {
       }
       const { answer } = payload
       await this.pc.setRemoteDescription(answer)
-      // this.pc.onicecandidate = e => this.handleOnIceCandidateEvent(e,currUser ,to)
-      // this.pc.ontrack = e => this.handleOntrack(e)
       await this.handleBufferedIceCandidates()
 
     } catch (err) {
@@ -198,7 +196,7 @@ class WebRTC {
       console.error("no ice candidate received in this payload")
       return;
     }
-    iceCandidatesInstance.parseIceCandidates(iceCandidate)
+    iceCandidatesInstance.trackCandidates(iceCandidate, "remote")
     if (!this.pc?.currentRemoteDescription) {
       this.iceCandidatesBufferQueue.push(iceCandidate)
       console.log("ice candidate added to the buffer queue")
@@ -241,7 +239,7 @@ class WebRTC {
       console.log("ice candidate not in the event")
       return;
     }
-    iceCandidatesInstance.parseIceCandidates(e.candidate)
+    iceCandidatesInstance.trackCandidates(e.candidate, "local")
     socketService.emit({
       type: "NEW_ICE_CANDIDATE",
       payload: {

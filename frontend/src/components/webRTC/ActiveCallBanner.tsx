@@ -80,12 +80,12 @@ const ActiveCallBanner = () => {
   }
 
   const handleCallRejectedByUser = async () => {
+    stopStream()
     setIdle()
   }
   const handleEndCallByUser = () => {
     stopStream()
     console.log("other party ended the call...")
-    webRTCInstance.endCall()
     setIdle()
   }
   useEffect(() => {
