@@ -191,7 +191,7 @@ class WebRTC {
   public async handleIncomingIceCandidates(payload: IceCandidatePayload) {
 
 
-    const { ceCandidate } = payload
+    const { iceCandidate } = payload
     if (!iceCandidate) {
       console.error("no ice candidate received in this payload")
       return;
