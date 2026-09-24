@@ -2,8 +2,7 @@ import { configuration } from "@/utils/stunServers"
 import { socketService } from "./websocket.service"
 import { eventBusInstance } from "@/learn/eventBus"
 import type { AnswerFromUserPayload, CallEndedPayload, CallRejectedByUserPayload, IceCandidatePayload, OfferFromUserPayload } from "@/types/websocket.types"
-import { iceCandidatesInstance } from "@/components/webRTC/iceCandidates.service"
-import type ConnectionTypeStats from "@/components/webRTC/stats/ConnectionTypeStats"
+import { iceCandidatesInstance, type CandidatePairReport } from "@/components/webRTC/iceCandidates.service"
 
 
 interface InitiateCallPayload {
@@ -296,11 +295,11 @@ class WebRTC {
     });
     return stats;
   }
-  public async getCurrentConnectionStats() {
+  public async getCurrentConnectionStats(): Promise<CandidatePairReport | undefined> {
     console.log("get senders: ", this.pc?.getSenders())
     if (!this.pc) {
       console.log("PLEASE WAIT FOR THE CONNECTION TO ESTABLISH")
-      return;
+      return
     }
     this.pc.getSenders().forEach(sender => {
 
@@ -308,10 +307,14 @@ class WebRTC {
         console.log("ice transport: ", sender.transport.iceTransport)
         const iceTransport = sender.transport.iceTransport;
         const selectedPair = iceTransport.getSelectedCandidatePair()
-        console.log("selecte pair: ", selectedPair)
+        if (!selectedPair?.local || !selectedPair.remote) {
+          console.error("no pair found")
+          return;
+        }
+        const readableStats = iceCandidatesInstance.userReadableFormat(selectedPair)
+        console.log("readableStats: ", readableStats)
+        return readableStats;
       }
-
-
     })
   }
 }

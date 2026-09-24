@@ -21,12 +21,8 @@ first steps toward the project [stats service in progress]
 
 NOTES FOR NEXT SESSION 
 
-- getSenders gives us sender for each track, each sender has transport info using .transport 
-- then there is ice transport in it  , selected pair gives us two local and remote ice candidates info, all protocols, port foundation, candidate raw string
-- find a method to parse or reuse the parsing mechanism created in the ice candidate service 
-- show the user, how they are connected, local IP or public IP or TURN 
-- by default it will be local
-
+- in webRTC service for each loop return is readable stats, but we need to return actual stats for both the senders, video and audio 
+- handle both UI states too, change in connectiontypestats
 
 
 -- after this is done, try to give user options to select how they want to connect
