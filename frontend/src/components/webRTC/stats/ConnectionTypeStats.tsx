@@ -28,7 +28,7 @@ const ConnectionTypeStats = () => {
       </Button>
       {
         report &&
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 text-sm font-mono space-y-3">
+        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 text-sm font-mono space-y-3 w-max h-max">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
             <span className="font-bold text-white text-base">{report.routeType}</span>
             <span className={`px-2 py-0.5 text-xs rounded font-semibold ${report.isRelayed ? "bg-amber-950 text-amber-400" : "bg-emerald-950 text-emerald-400"

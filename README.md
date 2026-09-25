@@ -21,8 +21,9 @@ first steps toward the project [stats service in progress]
 
 NOTES FOR NEXT SESSION 
 
-- in webRTC service for each loop return is readable stats, but we need to return actual stats for both the senders, video and audio 
-- handle both UI states too, change in connectiontypestats
-
+- candidate pair info is now shown in the UI
+- getStats function is still very large, outboundrtp inboundrtp stats, these are remaining to display 
+- just a switch case, interface, parsing, and returning to the component
+- look into calculating of stats (a whole framework/service is to be created)
 
 -- after this is done, try to give user options to select how they want to connect

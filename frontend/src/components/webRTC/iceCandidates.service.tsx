@@ -144,6 +144,9 @@ class IceCandidatesOperations {
   }
   private getIpScope(ip: string): CandidateAnalysis["ipScope"] {
     if (!ip) return "Unknown";
+    if (ip.endsWith(".local") || ip.endsWith(".Invalid")) {
+      return "LAN (Private IPv4)"
+    }
     if (ip === "127.0.0.1" || ip === "::1") return "Localhost";
     if (ip.includes(":")) return "Global IPv6";
     if (/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(ip)) {

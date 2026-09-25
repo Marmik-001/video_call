@@ -10,6 +10,25 @@ interface InitiateCallPayload {
   call_to: string,
   myUsername: string
 }
+export interface SenderTrackStats {
+  kind: "audio" | "video";
+  trackId?: string;
+  codec?: string;
+  bytesSent: number;
+  packetsSent: number;
+  // Video specific:
+  framesEncoded?: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  framesPerSecond?: number;
+  // Audio specific:
+  audioLevel?: number;
+}
+
+export interface DetailedConnectionStats {
+  connection: CandidatePairReport; // The candidate pair (LAN, P2P, Relay, RTT)
+  senders: SenderTrackStats[];     // Array of individual sender stats
+}
 
 class WebRTC {
 
@@ -268,14 +287,12 @@ class WebRTC {
 
   public async peerConnectionStats(): Promise<RTCStatsReport | null> {
     const stats = await this.pc?.getStats()
-    console.log("stats: ", stats)
     if (!stats) {
       return null;
     }
 
     stats.forEach((report) => {
       console.log("report type: ", report.type)
-
       switch (report.type) {
         case "inbound-rtp": {
           const r = report as RTCInboundRtpStreamStats
@@ -295,28 +312,29 @@ class WebRTC {
     });
     return stats;
   }
-  public async getCurrentConnectionStats(): Promise<CandidatePairReport | undefined> {
+  public async getCurrentConnectionStats(): Promise<CandidatePairReport | Error> {
     console.log("get senders: ", this.pc?.getSenders())
     if (!this.pc) {
       console.log("PLEASE WAIT FOR THE CONNECTION TO ESTABLISH")
-      return
+      return new Error("WAIT FOR THE CONNECTION TO ESTABLISH")
     }
-    this.pc.getSenders().forEach(sender => {
+    const sender = this.pc.getSenders().find(s => s.transport)
+    const selectedPair = sender?.transport?.iceTransport.getSelectedCandidatePair()
+    if (!selectedPair) {
+      console.error("error no selected pair found")
+      return new Error("no selected pair found")
+    }
 
-      if (sender.transport) {
-        console.log("ice transport: ", sender.transport.iceTransport)
-        const iceTransport = sender.transport.iceTransport;
-        const selectedPair = iceTransport.getSelectedCandidatePair()
-        if (!selectedPair?.local || !selectedPair.remote) {
-          console.error("no pair found")
-          return;
-        }
-        const readableStats = iceCandidatesInstance.userReadableFormat(selectedPair)
-        console.log("readableStats: ", readableStats)
-        return readableStats;
-      }
-    })
+    if (!selectedPair.local || !selectedPair.remote) {
+      console.error("no pair found")
+      return new Error("no lcaol remote pair found")
+    }
+    const readableStats = iceCandidatesInstance.userReadableFormat(selectedPair)
+    return readableStats
   }
+  //   public async getDetailedConnectionStats(): Promise<DetailedConnectionStats | undefined> {
+  //
+  // }
 }
 
 export const webRTCInstance = new WebRTC()
