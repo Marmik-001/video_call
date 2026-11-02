@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment & Test Artifacts
+.env
+.env*.local
+test-results/
+playwright-report/
+blob-report/

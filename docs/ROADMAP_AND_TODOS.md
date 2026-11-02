@@ -6,22 +6,36 @@
 
 - [x] **Slice 0: Clean Baseline Build & Fix Known Bugs**
   - Removed deprecated `baseUrl` in `tsconfig.app.json` and `tsconfig.json` without breaking `@/` path aliases.
-  - Added dependency array `[]` and cleanup function to `App.tsx`'s `useEffect` to avoid duplicate WebSocket connections on StrictMode mount. Verified single active socket per tab.
+  - Added dependency array `[]` and cleanup function to `App.tsx`'s `useEffect` to avoid duplicate WebSocket connections on StrictMode mount. Verified single active socket per tab in live browser execution.
   - Added dynamic signaling URL resolution (`getSignalingUrl`) with fallback to `ws://` / `wss://` and added `.env.example` templates for frontend and backend.
   - Installed pinned dependencies: `motion@14.9.0`, `zustand@5.0.16`, and `vitest@5.0.5`.
   - Removed unreachable prototype files in separate commit `05720df`.
   - Fixed all reachable code type errors, missing parameters, and fast-refresh lint issues properly.
   - `npm run build`, `tsc -b`, `eslint .`, and `npm test` all exit 0.
 
+- [x] **Slice 1a: In-Memory Loopback Engine & Testing Framework**
+  - Built `LoopbackService` with injected `PeerConnectionFactory` and automated data channel creation before `createOffer`.
+  - Built `useLabStore` with 2,000-event ring buffer and leak-free `reset()`.
+  - Implemented mailbox FIFO queue gating and trickle candidate buffering before `setRemoteDescription`.
+  - Tested orchestration and ring buffer with Vitest (5 tests).
+  - Built real WebRTC Playwright E2E test in headless Chromium verifying `connected` state, bidirectional `RTCDataChannel` message transfer, and post-reset closure.
+
+- [x] **Slice 1b: Beginner Mode Walkthrough UI (Steps 1–3)**
+  - Implemented `BeginnerLab` UI with stepper header, Next/Back controls, and `[SIMULATION: In-Memory Mailbox]` badge.
+  - Rendered Peer A, Peer B, and central Signaling Channel with packet animation using `motion/react` (respecting `prefers-reduced-motion`).
+  - Added expandable raw SDP viewer for Step 2 and real gathered candidate cards (with mDNS `.local` explanation) for Step 3.
+  - Added "What Just Happened?" contextual educational cards with the exact ICE explainer text.
+  - Documented manual testing checklist and start commands in `docs/TESTING.md`.
+
 ---
 
-## 🎯 Next Session Starts Here: Slice 1
+## 🎯 Next Session Starts Here: Slice 2 (Beginner Steps 4–6)
 
-- [ ] **Slice 1: In-Memory WebRTC Loopback Engine & Zustand Event Store**
-  - Implement Zustand `useLabStore` typed event model.
-  - Implement in-memory loopback peer connection pair (`peerA` ↔ `peerB`) in `loopback.service.ts`.
-  - Add simulated in-memory mailbox queue with pause/step hooks.
-  - Unit tests in Vitest for loopback offer/answer handshake and event dispatching.
+- [ ] **Slice 2: Beginner Mode Walkthrough (Steps 4–6)**
+  - **Step 4: NAT Basics**: Scripted educational SVG illustration showing router port translation and why STUN hole-punching is needed (labeled as illustration).
+  - **Step 5: Media Tracks**: Camera media stream attachment with automatic fallback to synthetic animated `canvas.captureStream()` if camera permission is denied or hardware is unavailable.
+  - **Step 6: Data Channels**: Deep dive into SCTP binary/text channels.
+  - Unit tests and Playwright E2E verification for synthetic media stream and Step 4–6 progression.
 
 ---
 
