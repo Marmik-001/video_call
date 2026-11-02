@@ -6,10 +6,12 @@
 
 - [x] **Slice 0: Clean Baseline Build & Fix Known Bugs**
   - Removed deprecated `baseUrl` in `tsconfig.app.json` and `tsconfig.json` without breaking `@/` path aliases.
-  - Added dependency array `[]` and cleanup function to `App.tsx`'s `useEffect` to avoid duplicate WebSocket connections on StrictMode mount.
-  - Added dynamic signaling URL resolution (`getSignalingUrl`) with fallback to `ws://` / `wss://` and added `.env.example` templates.
+  - Added dependency array `[]` and cleanup function to `App.tsx`'s `useEffect` to avoid duplicate WebSocket connections on StrictMode mount. Verified single active socket per tab.
+  - Added dynamic signaling URL resolution (`getSignalingUrl`) with fallback to `ws://` / `wss://` and added `.env.example` templates for frontend and backend.
   - Installed pinned dependencies: `motion@14.9.0`, `zustand@5.0.16`, and `vitest@5.0.5`.
-  - Configured `npm test` script with passing smoke and URL resolution unit tests.
+  - Removed unreachable prototype files in separate commit `05720df`.
+  - Fixed all reachable code type errors, missing parameters, and fast-refresh lint issues properly.
+  - `npm run build`, `tsc -b`, `eslint .`, and `npm test` all exit 0.
 
 ---
 

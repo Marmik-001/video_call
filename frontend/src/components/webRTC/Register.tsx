@@ -1,4 +1,4 @@
-import { useUser } from "@/context/UserContext"
+import { useUser } from "@/context/useUser"
 import { useEffect, useState } from "react"
 import { Button } from "../ui/button"
 import { eventBusInstance } from "@/learn/eventBus"
@@ -8,33 +8,30 @@ import { socketService } from "@/services/websocket.service"
 
 const Register = () => {
 
-  const { setCurrentUser, currentUser } = useUser()
+  const { setCurrentUser } = useUser()
   const [usernameInput, setUsernameInput] = useState('')
 
 
-  const handleUsernameTaken = () => {
-    window.alert("Username is taken, please use different username")
-    setUsernameInput('')
-    setCurrentUser('')
-
-  }
-  const handleUsernameEmpty = () => {
-
-    window.alert("Username cannot be empty")
-    setUsernameInput('')
-    setCurrentUser('')
-  }
   useEffect(() => {
+    const handleUsernameTaken = () => {
+      window.alert("Username is taken, please use different username")
+      setUsernameInput('')
+      setCurrentUser('')
+    }
+    const handleUsernameEmpty = () => {
+      window.alert("Username cannot be empty")
+      setUsernameInput('')
+      setCurrentUser('')
+    }
+
     const unsubscribeToUsernameTakenError = eventBusInstance.subscribe("ERROR:USERNAME_TAKEN", handleUsernameTaken)
     const unsubscribeToUsernameEmpty = eventBusInstance.subscribe("ERROR:USERNAME_EMPTY", handleUsernameEmpty)
 
-
     return () => {
-
       unsubscribeToUsernameEmpty()
       unsubscribeToUsernameTakenError()
     }
-  })
+  }, [setCurrentUser])
 
   const handleUserRegister = async () => {
 

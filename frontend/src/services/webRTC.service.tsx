@@ -116,8 +116,11 @@ class WebRTC {
     }
   }
 
-  public endCall(payload: CallEndedPayload) {
+  public endCall(payload?: CallEndedPayload) {
     try {
+      if (payload) {
+        console.log("Ending call between", payload.from, "and", payload.to);
+      }
       this.pc?.getSenders().forEach((sender) => sender.track?.stop())
       this.pc?.close()
       this.pc = null
@@ -296,12 +299,12 @@ class WebRTC {
       switch (report.type) {
         case "inbound-rtp": {
           const r = report as RTCInboundRtpStreamStats
-          console.log("report type is inbound-rtp")
+          console.log("report type is inbound-rtp", r.id)
           break;
         }
         case "outbound-rtp": {
           const r = report as RTCOutboundRtpStreamStats
-          console.log("report type is outbound-rtp")
+          console.log("report type is outbound-rtp", r.id)
           break;
         }
         default: {

@@ -4,9 +4,8 @@ import type { AnswerFromUserPayload, OfferFromUserPayload } from "@/types/websoc
 import { useEffect } from "react"
 import { Button } from "../ui/button"
 import { useUserMedia } from "@/hooks/useUserMedia"
-import { useUser } from "@/context/UserContext"
-import { useCallStatus } from "@/context/CallContext"
-import { socketService } from "@/services/websocket.service"
+import { useUser } from "@/context/useUser"
+import { useCallStatus } from "@/context/useCallStatus"
 
 const ActiveCallBanner = () => {
 

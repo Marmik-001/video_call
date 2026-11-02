@@ -1,4 +1,4 @@
-import { useUser } from "@/context/UserContext"
+import { useUser } from "@/context/useUser"
 import { Button } from "../ui/button"
 import { socketService } from "@/services/websocket.service"
 import { useEffect, useState } from "react"
@@ -6,7 +6,7 @@ import { eventBusInstance } from "@/learn/eventBus"
 import type { ReturnAllActiveClientsPayload } from "@/types/websocket.types"
 import { webRTCInstance } from "@/services/webRTC.service"
 import { useUserMedia } from "@/hooks/useUserMedia"
-import { useCallStatus } from "@/context/CallContext"
+import { useCallStatus } from "@/context/useCallStatus"
 
 
 

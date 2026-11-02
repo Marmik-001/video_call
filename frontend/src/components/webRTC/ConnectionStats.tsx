@@ -1,16 +1,20 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "../ui/button"
 import { webRTCInstance } from "@/services/webRTC.service"
 import ConnectionTypeStats from "./stats/ConnectionTypeStats"
 
-
-interface StatsType {
-
-}
 const ConnectionStats = () => {
 
   const [currentStats, setCurrentStats] = useState<RTCStatsReport[]>([])
   const statsIntervalRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (statsIntervalRef.current) {
+        clearInterval(statsIntervalRef.current)
+      }
+    }
+  }, [])
 
   const startStatsReport = async () => {
 
@@ -47,11 +51,8 @@ const ConnectionStats = () => {
       hello world
       <Button onClick={startStatsReport}> Get Stats </ Button>
       <Button onClick={stopStatsReport}> Stop Stats </Button>
+      <p>Active Reports: {currentStats.length}</p>
       <ConnectionTypeStats />
-      {
-
-
-      }
     </div>
   )
 }

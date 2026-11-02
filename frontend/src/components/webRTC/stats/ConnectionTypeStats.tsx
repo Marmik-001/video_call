@@ -11,12 +11,12 @@ const ConnectionTypeStats = () => {
   const [report, setReport] = useState<CandidatePairReport | null>()
 
   const handleGetSendersInfo = async () => {
-    const stats: CandidatePairReport | undefined = await webRTCInstance.getCurrentConnectionStats()
-    console.log("stats: ", stats)
-    if (stats == undefined) {
+    const statsResult = await webRTCInstance.getCurrentConnectionStats()
+    console.log("stats: ", statsResult)
+    if (statsResult instanceof Error) {
       return;
     }
-    setReport(stats)
+    setReport(statsResult)
   }
 
 

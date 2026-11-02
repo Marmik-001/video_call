@@ -1,38 +1,35 @@
 import type { EventPayload, EventType } from "@/types/event.types";
-import type { ServerMessage, ServerMessageType } from "@/types/websocket.types";
 
+export type EventBusCallback<T = unknown> = (payload: T) => void;
 
 class EventBus {
-    private events: Map<string, Set<Function>> = new Map();
+    private events: Map<string, Set<(payload: unknown) => void>> = new Map();
 
-    public subscribe(eventName: EventType ,  callback: Function) {
+    public subscribe<T = EventPayload>(eventName: EventType, callback: EventBusCallback<T>) {
         if (!this.events.has(eventName)) {
-            this.events.set(eventName , new Set())
+            this.events.set(eventName, new Set())
         }
         const listeners = this.events.get(eventName)
-        listeners?.add(callback)
+        const typedCallback = callback as (payload: unknown) => void;
+        listeners?.add(typedCallback)
         return () => {
-            listeners?.delete(callback)
+            listeners?.delete(typedCallback)
             if (listeners?.size === 0) {   
                 this.events.delete(eventName)
             }
         }
     }
 
-    public publish( eventType: EventType ,  payload: EventPayload)  {
-
+    public publish(eventType: EventType, payload: EventPayload) {
         const listeners = this.events.get(eventType)
-
         if (!listeners) return;
         
-        listeners?.forEach((callback) => {
-            if (payload) {
-
+        listeners.forEach((callback) => {
+            if (payload !== undefined && payload !== null) {
                 callback(payload)
             }
         }) 
     }
 }
-
 
 export const eventBusInstance = new EventBus();

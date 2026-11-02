@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { getSignalingUrl, parseWebSocketResponse } from "./utils/websocket.utils";
 
 describe("getSignalingUrl helper", () => {
-  const originalEnv = process.env.VITE_SIGNALING_URL;
+  const originalEnv = import.meta.env.VITE_SIGNALING_URL;
 
   afterEach(() => {
     if (originalEnv) {
-      process.env.VITE_SIGNALING_URL = originalEnv;
+      import.meta.env.VITE_SIGNALING_URL = originalEnv;
     } else {
-      delete process.env.VITE_SIGNALING_URL;
+      delete import.meta.env.VITE_SIGNALING_URL;
     }
   });
 
   it("derives ws:// URL on insecure context", () => {
-    delete process.env.VITE_SIGNALING_URL;
+    delete import.meta.env.VITE_SIGNALING_URL;
     const url = getSignalingUrl();
     expect(url.startsWith("ws://") || url.startsWith("wss://")).toBe(true);
   });
