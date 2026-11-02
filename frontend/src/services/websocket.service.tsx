@@ -10,6 +10,13 @@ class Websocket {
       connect
   **/
   public connect(url: string) {
+    if (this.ws) {
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        return;
+      }
+      this.disconnect();
+    }
+
     this.ws = new WebSocket(url)
 
     this.ws.onopen = this.wsOnOpenHandler
@@ -19,6 +26,19 @@ class Websocket {
     this.ws.onmessage = this.wsOnMessageHandler
 
     this.ws.onerror = this.wsOnErrorHandler
+  }
+
+  public disconnect() {
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.close();
+      }
+      this.ws = null;
+    }
   }
 
   private wsOnMessageHandler(e: MessageEvent) {

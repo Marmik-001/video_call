@@ -13,8 +13,10 @@ const wss = new WebSocketServer({ server });
 
 
 wss.on("connection", (ws) => {
+  console.log(`[WSS] Client connected. Total active connections: ${wss.clients.size}`);
   ws.on("message", (e) => onMessageHandler(e , ws ));
   ws.on("close", function () {
+    console.log(`[WSS] Client disconnected. Total active connections: ${wss.clients.size}`);
     onCloseHandler(ws)
   });
 });
