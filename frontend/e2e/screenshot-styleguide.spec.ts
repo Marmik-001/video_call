@@ -52,4 +52,21 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     path: path.join(screenshotsDir, "styleguide-390.png"),
     fullPage: false,
   });
+
+  // 3. Beginner Lab with React Bits (Desktop)
+  await page.setViewportSize({ width: 1280, height: 950 });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await page.waitForSelector("text=WebRTC Learning Lab");
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-react-bits-desktop.png"),
+    fullPage: false,
+  });
+
+  // 4. Beginner Lab with React Bits (Mobile)
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-react-bits-mobile.png"),
+    fullPage: false,
+  });
 });
