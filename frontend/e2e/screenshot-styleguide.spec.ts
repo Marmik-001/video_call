@@ -14,9 +14,9 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
   await page.waitForLoadState("networkidle");
 
   // Wait for the styleguide heading
-  await page.waitForSelector("text=WebRTC Lab Styleguide & Design Standard");
+  await page.waitForSelector("text=WebRTC Lab");
 
-  // Take desktop screenshot (full page to see tokens, components, and Step 2 demo)
+  // Take desktop screenshot
   await page.screenshot({
     path: path.join(screenshotsDir, "styleguide-1280.png"),
     fullPage: false,
@@ -32,11 +32,21 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     });
   }
 
+  // Also capture the Pro sample card
+  const proCardElement = page.locator("#pro-card");
+  if (await proCardElement.isVisible()) {
+    await proCardElement.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: path.join(screenshotsDir, "styleguide-1280-pro.png"),
+      fullPage: false,
+    });
+  }
+
   // 2. Mobile 390x844
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/styleguide");
   await page.waitForLoadState("networkidle");
-  await page.waitForSelector("text=WebRTC Lab Styleguide & Design Standard");
+  await page.waitForSelector("text=WebRTC Lab");
 
   await page.screenshot({
     path: path.join(screenshotsDir, "styleguide-390.png"),

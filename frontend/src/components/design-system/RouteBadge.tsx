@@ -21,13 +21,13 @@ export function RouteBadge({
   ...props
 }: RouteBadgeProps) {
   const variantStyles: Record<RouteBadgeVariant, string> = {
-    host: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-    srflx: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20",
-    relay: "bg-purple-500/10 text-purple-400 border border-purple-500/20",
-    checking: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
-    error: "bg-rose-500/10 text-rose-400 border border-rose-500/20",
-    simulation: "bg-cyan-950/40 text-cyan-300 border border-dashed border-cyan-500/40",
-    neutral: "bg-slate-800/60 text-slate-300 border border-slate-700/50",
+    host: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25",
+    srflx: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/25",
+    relay: "bg-purple-500/10 text-purple-400 border border-purple-500/25",
+    checking: "bg-amber-500/10 text-amber-400 border border-amber-500/25",
+    error: "bg-rose-500/10 text-rose-400 border border-rose-500/25",
+    simulation: "bg-[#171717] text-[#a1a1a1] border border-dashed border-[#404040]",
+    neutral: "bg-[#121212] text-[#a1a1a1] border border-[#262626]",
   };
 
   return (

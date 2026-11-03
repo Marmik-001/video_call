@@ -11,7 +11,7 @@ function App() {
         return "styleguide";
       }
     }
-    return "styleguide"; // Default to styleguide for this review slice
+    return "lab";
   });
 
   useEffect(() => {
