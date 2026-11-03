@@ -41,6 +41,9 @@ export interface LabState {
   dataChannelMessages: { from: "A" | "B"; text: string; timestamp: number }[];
   peerAConnectionState: RTCPeerConnectionState;
   peerBConnectionState: RTCPeerConnectionState;
+  localMediaStream: MediaStream | null;
+  remoteMediaStream: MediaStream | null;
+  mediaStatus: "idle" | "requesting" | "live" | "synthetic" | "error";
 
   // Actions
   setStep: (step: number) => void;
@@ -55,6 +58,9 @@ export interface LabState {
   addDataChannelMessage: (msg: { from: "A" | "B"; text: string }) => void;
   setPeerAConnectionState: (state: RTCPeerConnectionState) => void;
   setPeerBConnectionState: (state: RTCPeerConnectionState) => void;
+  setLocalMediaStream: (stream: MediaStream | null) => void;
+  setRemoteMediaStream: (stream: MediaStream | null) => void;
+  setMediaStatus: (status: "idle" | "requesting" | "live" | "synthetic" | "error") => void;
   reset: () => void;
 }
 
@@ -71,6 +77,9 @@ export const useLabStore = create<LabState>((set, get) => ({
   dataChannelMessages: [],
   peerAConnectionState: "new",
   peerBConnectionState: "new",
+  localMediaStream: null,
+  remoteMediaStream: null,
+  mediaStatus: "idle",
 
   setStep: (step) => set({ currentStep: step }),
   setIsPaused: (paused) => set({ isPaused: paused }),
@@ -125,6 +134,9 @@ export const useLabStore = create<LabState>((set, get) => ({
 
   setPeerAConnectionState: (state) => set({ peerAConnectionState: state }),
   setPeerBConnectionState: (state) => set({ peerBConnectionState: state }),
+  setLocalMediaStream: (stream) => set({ localMediaStream: stream }),
+  setRemoteMediaStream: (stream) => set({ remoteMediaStream: stream }),
+  setMediaStatus: (status) => set({ mediaStatus: status }),
 
   reset: () =>
     set({
@@ -138,5 +150,8 @@ export const useLabStore = create<LabState>((set, get) => ({
       dataChannelMessages: [],
       peerAConnectionState: "new",
       peerBConnectionState: "new",
+      localMediaStream: null,
+      remoteMediaStream: null,
+      mediaStatus: "idle",
     }),
 }));

@@ -29,13 +29,24 @@
 
 ---
 
-## 🎯 Next Session Starts Here: Slice 2 (Beginner Steps 4–6)
+- [x] **Slice 2: Beginner Mode Walkthrough (Steps 1–6 Complete with Neutral Vercel Theme)**
+  - Applied the approved Vercel obsidian design standard (`#000000`, 1px borders `#242424`, 8px card radius, 6px buttons).
+  - Implemented all 6 parts of `TEACHING_STANDARD.md` across every step: Human Question, Canonical Analogy, Live Demo, What Just Happened, Progressive Disclosure Data, and Soft-Gated Check Yourself Quizzes.
+  - **Step 4: NAT Basics**: Interactive port translation and pinholing simulation labeled `[ILLUSTRATION: Educational Animation]`.
+  - **Step 5: Media Tracks**: Physical camera attachment with automated fallback to synthetic animated `canvas.captureStream()`.
+  - **Step 6: Data Channels**: Bidirectional real-time SCTP P2P chat.
+  - Added unit test in `src/utils/media.test.ts` and automated Playwright E2E suite in `e2e/steps.spec.ts`.
+  - All 10 unit tests and 3 Playwright test suites passing with 0 errors.
 
-- [ ] **Slice 2: Beginner Mode Walkthrough (Steps 4–6)**
-  - **Step 4: NAT Basics**: Scripted educational SVG illustration showing router port translation and why STUN hole-punching is needed (labeled as illustration).
-  - **Step 5: Media Tracks**: Camera media stream attachment with automatic fallback to synthetic animated `canvas.captureStream()` if camera permission is denied or hardware is unavailable.
-  - **Step 6: Data Channels**: Deep dive into SCTP binary/text channels.
-  - Unit tests and Playwright E2E verification for synthetic media stream and Step 4–6 progression.
+---
+
+## 🎯 Next Session Starts Here: Phase 2 — Pro Lab Mode (Slice 3: Room-Link Mode)
+
+- [ ] **Slice 3: Room-Link Mode**
+  - Random 128-bit room IDs (`crypto.randomUUID()`) via URL hash (`#room=<id>`).
+  - Backend in-memory room management (max 2 peers per room, unguessable IDs, deleted when empty).
+  - Two-tab testing documentation banner in UI.
+  - Playwright E2E multi-page room connection test.
 
 ---
 

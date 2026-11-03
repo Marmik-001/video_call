@@ -113,6 +113,20 @@ export class LoopbackService {
         summary: "Data channel received on Peer B",
       });
     };
+
+    // Handle media track arrival on Peer B
+    this.peerB.ontrack = (e) => {
+      if (e.streams && e.streams[0]) {
+        useLabStore.getState().setRemoteMediaStream(e.streams[0]);
+      } else {
+        const stream = new MediaStream([e.track]);
+        useLabStore.getState().setRemoteMediaStream(stream);
+      }
+      useLabStore.getState().pushEvent({
+        category: "STATS",
+        summary: `Peer B received remote media track (${e.track.kind})`,
+      });
+    };
   }
 
   public async startOfferFlow() {
@@ -261,7 +275,28 @@ export class LoopbackService {
     }
   }
 
+  public attachMediaStream(stream: MediaStream) {
+    useLabStore.getState().setLocalMediaStream(stream);
+    if (this.peerA) {
+      for (const track of stream.getTracks()) {
+        this.peerA.addTrack(track, stream);
+      }
+      useLabStore.getState().pushEvent({
+        category: "STATS",
+        summary: `Attached ${stream.getTracks().length} media track(s) to Peer A`,
+      });
+    }
+  }
+
   public reset() {
+    const state = useLabStore.getState();
+    if (state.localMediaStream) {
+      state.localMediaStream.getTracks().forEach((t) => t.stop());
+    }
+    if (state.remoteMediaStream) {
+      state.remoteMediaStream.getTracks().forEach((t) => t.stop());
+    }
+
     if (this.peerA) {
       this.peerA.onconnectionstatechange = null;
       this.peerA.onicecandidate = null;
@@ -272,6 +307,7 @@ export class LoopbackService {
       this.peerB.onconnectionstatechange = null;
       this.peerB.onicecandidate = null;
       this.peerB.ondatachannel = null;
+      this.peerB.ontrack = null;
       this.peerB.close();
       this.peerB = null;
     }
