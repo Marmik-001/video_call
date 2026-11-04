@@ -39,7 +39,11 @@ interface WsFrame {
   id: string;
   timestamp: string;
   direction: "A ➔ SRV" | "B ➔ SRV" | "SRV ➔ A" | "SRV ➔ B" | "SRV ➔ ALL" | "A ➔ SRV ➔ B";
+  title: string;
+  explanation: string;
   payload: string;
+  badge?: string;
+  emoji?: string;
 }
 
 export const BeginnerLab: React.FC = () => {
@@ -80,7 +84,11 @@ export const BeginnerLab: React.FC = () => {
       id: "init",
       timestamp: new Date().toLocaleTimeString(),
       direction: "SRV ➔ ALL",
+      title: "Server Standby • Listening for Peers",
+      explanation: "The central signaling server is online at wss://signaling.lab:443. It awaits WebSocket connections from peers wishing to meet in room 'mesh-402'.",
       payload: '{"status":"ready","server":"wss://signaling.lab:443","room":"mesh-402"}',
+      badge: "STANDBY",
+      emoji: "☁️",
     },
   ]);
 
@@ -143,25 +151,37 @@ export const BeginnerLab: React.FC = () => {
         id: `ws-${Date.now()}-1`,
         timestamp: now,
         direction: "A ➔ SRV",
+        title: "Peer A joins room 'mesh-402'",
+        explanation: "Peer A establishes a WebSocket connection to the matchmaker server and registers: 'I am Peer A (caller_a19). Let me know when another peer enters room mesh-402.'",
         payload: '{"action":"join_room","clientId":"caller_a19","room":"mesh-402"}',
+        badge: "JOIN_ROOM",
+        emoji: "👤",
       },
       {
         id: `ws-${Date.now()}-2`,
         timestamp: now,
         direction: "B ➔ SRV",
+        title: "Peer B joins room 'mesh-402'",
+        explanation: "Peer B connects to the same matchmaker server: 'I am Peer B (callee_b82). I am in room mesh-402 and ready to receive connection requests.'",
         payload: '{"action":"join_room","clientId":"callee_b82","room":"mesh-402"}',
+        badge: "JOIN_ROOM",
+        emoji: "👤",
       },
       {
         id: `ws-${Date.now()}-3`,
         timestamp: now,
         direction: "SRV ➔ ALL",
+        title: "Matchmaker announces: Room is Ready!",
+        explanation: "The server broadcasts to both peers: 'Both parties are online in room mesh-402! Peer A, you may now generate and send your SDP offer.'",
         payload: '{"event":"room_ready","room":"mesh-402","peers":["caller_a19","callee_b82"]}',
+        badge: "ROOM_READY",
+        emoji: "🎉",
       },
     ]);
 
     setLastReaction({
       title: "WebSocket Handshake Verified",
-      detail: "Both peers upgraded HTTP to WebSocket (101 Switching Protocols) and joined room 'mesh-402'. The server now holds open TCP sockets for both clients.",
+      detail: "Both peers upgraded HTTP to WebSocket (101 Switching Protocols) and joined room 'mesh-402'. The server holds open two-way TCP channels so both clients can exchange SDP credentials.",
       badge: "WEBSOCKET 101",
       timestamp: now,
     });
@@ -185,7 +205,11 @@ export const BeginnerLab: React.FC = () => {
         id: `ws-${Date.now()}-ping`,
         timestamp: now,
         direction: "A ➔ SRV ➔ B",
+        title: "Relay Health Ping (A ➔ Server ➔ B)",
+        explanation: "Peer A sends a lightweight JSON ping through the server to test relay health. The matchmaker immediately forwards it to Peer B to prove bidirectional transport works.",
         payload: '{"type":"signal_relay","from":"caller_a19","data":{"type":"ping","note":"ready_for_sdp"}}',
+        badge: "PING_RELAY",
+        emoji: "⚡",
       },
     ]);
 
@@ -582,89 +606,115 @@ export const BeginnerLab: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
-            className="flex-1 min-h-0 w-full grid grid-cols-12 gap-2.5"
+            className="flex-1 min-h-0 h-full w-full grid grid-cols-12 grid-rows-1 gap-2.5"
           >
             {/* LEFT HERO: BASELINE EXPLANATION & ACTION DECK (Col 5) */}
-            <div className="col-span-12 lg:col-span-5 h-full flex flex-col justify-between rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3.5 shadow-sm overflow-hidden">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Cloud className="h-4 w-4 text-cyan-400" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#ededed]">
-                      Step 1 • The Matchmaker (Signaling)
-                    </span>
+            <div className="col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col justify-between rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 shadow-sm overflow-hidden">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between border-b border-[#222222] pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🤝</span>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Cloud className="h-4 w-4 text-cyan-400" />
+                        <span className="text-sm sm:text-base font-bold text-[#ededed]">
+                          Step 1 • The Matchmaker (Signaling)
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Discovery & Rendezvous</span>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-cyan-500/30 bg-cyan-950/20 text-cyan-300">
-                    Phase: Rendezvous
+                  <span className="text-xs font-mono px-2 py-0.5 rounded-[6px] border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 font-semibold">
+                    🌐 WebSocket Online
                   </span>
                 </div>
 
+                {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
+                <div className="rounded-[8px] border border-cyan-500/40 bg-gradient-to-r from-cyan-950/30 via-cyan-900/10 to-transparent p-2.5 space-y-1 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-cyan-300">
+                    <span>🎯</span>
+                    <span>Why Are We Doing This?</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
+                    Before two browsers can talk directly, neither knows the other's IP address or private home router port.
+                    We use this temporary server as a "matchmaker" just long enough to swap contact cards — once connected, real video and audio never touch this server!
+                  </p>
+                </div>
+
                 {/* The Core Problem & Baseline */}
-                <div className="space-y-1.5">
-                  <h3 className="text-sm font-semibold text-[#ededed] flex items-center gap-1.5">
-                    <span className="text-amber-400">❓</span>
+                <div className="space-y-1">
+                  <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
+                    <span>❓</span>
                     <span>The Chicken-and-Egg Dilemma</span>
                   </h3>
-                  <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                  <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
                     WebRTC creates direct, encrypted peer-to-peer pipelines for video and data. But <strong className="text-[#ededed]">two browsers cannot dial each other blindly</strong>. They live behind private home routers (NAT) and neither browser knows the other's public IP or supported codecs.
                   </p>
                 </div>
 
                 {/* Mental Model & Analogy */}
-                <div className="rounded-[6px] border border-[#1e1e1e] bg-[#121212]/80 p-2.5 space-y-1 text-xs">
-                  <span className="text-[11px] font-mono uppercase text-[#777777] block">Mental Model & Analogy</span>
-                  <p className="text-[#ededed] italic leading-normal">
+                <div className="rounded-[8px] border border-[#222222] bg-[#121212] p-2.5 space-y-1 text-xs sm:text-sm">
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1">
+                    <span>💡</span>
+                    <span>Mental Model & Analogy</span>
+                  </span>
+                  <p className="text-[#ededed] italic leading-relaxed">
                     "You want to make a private phone call with someone across the world, but you first need a mutual friend to introduce you and exchange your phone numbers."
                   </p>
                 </div>
 
                 {/* The WebRTC Rule */}
-                <div className="text-[11px] font-mono text-[#888888] space-y-1 border-l-2 border-cyan-500/50 pl-2">
-                  <p><strong className="text-[#ededed]">Key Protocol Fact:</strong> WebRTC intentionally specifies <span className="underline decoration-cyan-500/50">zero signaling</span>. Developers choose the transport (WebSocket, HTTP REST, SIP, or Firebase).</p>
+                <div className="text-xs sm:text-sm font-mono text-[#888888] space-y-0.5 border-l-2 border-cyan-500/60 pl-2.5 py-0.5">
+                  <p>
+                    <strong className="text-[#ededed]">🔑 Key Protocol Fact:</strong> WebRTC intentionally specifies <span className="underline decoration-cyan-500 text-cyan-200">zero signaling</span>. Developers choose the transport (WebSocket, HTTP REST, SIP, or Firebase).
+                  </p>
                 </div>
               </div>
 
               {/* Numbered Action Directive ("What tells you what to do") */}
               <div className="space-y-2 pt-2 border-t border-[#1e1e1e]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase text-[#777777]">Interactive Directives</span>
-                  <span className="text-[10px] font-mono text-cyan-400">2-Stage Verification</span>
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1">
+                    <span>⚡</span>
+                    <span>Interactive Directives</span>
+                  </span>
+                  <span className="text-xs font-mono text-cyan-400 font-medium">2-Stage Verification</span>
                 </div>
 
                 <div className="flex gap-2">
                   <SpecularButton
                     onClick={handleConnectSignaling}
                     data-testid="btn-start-offer"
-                    className={`flex-1 h-8 text-xs font-semibold ${signalingConnected ? "opacity-90" : ""}`}
+                    className={`flex-1 h-9 text-xs sm:text-sm font-semibold ${signalingConnected ? "opacity-90" : ""}`}
                   >
-                    <Zap className="h-3.5 w-3.5" />
+                    <Zap className="h-3.5 w-3.5 mr-1 text-amber-400" />
                     <span>{signalingConnected ? "1. Connected & Offer Initialized" : "1. Connect Peers to Server"}</span>
                   </SpecularButton>
 
                   <button
                     type="button"
                     onClick={handleDispatchPing}
-                    className="px-3 h-8 rounded-[6px] border border-[#242424] bg-[#141414] text-xs font-mono text-[#ededed] hover:border-[#404040] transition-all flex items-center gap-1.5"
+                    className="px-3.5 h-9 rounded-[6px] border border-[#242424] bg-[#141414] text-xs sm:text-sm font-mono text-[#ededed] hover:border-[#404040] hover:bg-[#1a1a1a] transition-all flex items-center gap-1.5"
                   >
                     <span>2. Send Ping</span>
-                    <ArrowRight className="h-3 w-3" />
+                    <ArrowRight className="h-3.5 w-3.5 text-cyan-400" />
                   </button>
                 </div>
 
                 {/* Action Reaction Feed */}
-                <div className="rounded-[6px] border border-[#262626] bg-[#111111]/90 p-2 space-y-1">
+                <div className="rounded-[8px] border border-[#262626] bg-[#111111] p-2 space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                      <span className="text-[11px] font-semibold text-[#ededed]">{lastReaction.title}</span>
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span className="text-xs sm:text-sm font-semibold text-[#ededed]">{lastReaction.title}</span>
                     </div>
                     {lastReaction.badge && (
-                      <span className="rounded bg-[#1c1c1c] px-1.5 py-0.2 text-[9px] font-mono text-[#a1a1a1]">
+                      <span className="rounded bg-[#1c1c1c] px-2 py-0.5 text-xs font-mono text-cyan-300 border border-[#2c2c2c]">
                         {lastReaction.badge}
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-[#a1a1a1] font-mono leading-normal">
+                  <p className="text-xs text-[#a1a1a1] font-mono leading-relaxed">
                     {lastReaction.detail}
                   </p>
                 </div>
@@ -672,34 +722,38 @@ export const BeginnerLab: React.FC = () => {
             </div>
 
             {/* RIGHT FLANK: NETWORK STAGE + WEBSOCKET PROTOCOL LOG & DATA PIPE (Col 7) */}
-            <div className="col-span-12 lg:col-span-7 h-full flex flex-col gap-2.5">
-              {/* TOP: VISUAL TOPOLOGY STAGE (~52% height) */}
-              <div className="h-[52%] rounded-[8px] border border-[#242424] bg-[#0c0c0c] p-3 flex flex-col justify-between relative overflow-hidden shadow-sm">
+            <div className="col-span-12 lg:col-span-7 h-full min-h-0 flex flex-col gap-2.5">
+              {/* TOP: VISUAL TOPOLOGY STAGE (~44% height) */}
+              <div className="h-[44%] shrink-0 rounded-[8px] border border-[#242424] bg-[#0c0c0c] p-2.5 flex flex-col justify-between relative overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
                   <div className="flex items-center gap-2">
-                    <Activity className="h-3.5 w-3.5 text-cyan-400" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#ededed]">
-                      Rendezvous Highway Topology
+                    <Activity className="h-4 w-4 text-cyan-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
+                      <span>🌐</span>
+                      <span>Rendezvous Highway Topology</span>
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#777777]">
-                    Cloud Broker • Room #mesh-402
+                  <span className="text-xs font-mono text-[#888888] flex items-center gap-1">
+                    <span>☁️</span>
+                    <span>Cloud Broker • Room #mesh-402</span>
                   </span>
                 </div>
 
                 {/* Central Server & Client Nodes Visual */}
-                <div className="relative my-auto flex flex-col items-center justify-between h-40 py-1">
+                <div className="relative my-auto flex flex-col items-center justify-between h-36 py-1">
                   {/* Central Cloud Matchmaker */}
                   <div className="z-10 flex flex-col items-center gap-1">
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-[8px] border transition-all ${
+                    <div className={`flex items-center gap-2.5 px-3 py-1.5 rounded-[8px] border transition-all ${
                       signalingConnected
                         ? "border-cyan-500/50 bg-cyan-950/30 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.25)]"
                         : "border-[#242424] bg-[#141414] text-[#777777]"
                     }`}>
-                      <Server className="h-4 w-4" />
+                      <Server className="h-4 w-4 text-cyan-400 shrink-0" />
                       <div className="text-left font-mono">
-                        <div className="text-[11px] font-semibold text-[#ededed]">Signaling Server (Matchmaker)</div>
-                        <div className="text-[9px] text-[#888888]">wss://signaling.lab:443 • Room mesh-402</div>
+                        <div className="text-xs sm:text-sm font-semibold text-[#ededed] flex items-center gap-1">
+                          <span>☁️ Signaling Server (Matchmaker)</span>
+                        </div>
+                        <div className="text-xs text-[#888888]">wss://signaling.lab:443 • Room #mesh-402</div>
                       </div>
                     </div>
                   </div>
@@ -732,50 +786,57 @@ export const BeginnerLab: React.FC = () => {
                   {/* Bottom Peer Nodes */}
                   <div className="w-full flex items-center justify-between px-4 z-10">
                     {/* Peer A Node */}
-                    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-[6px] border ${
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-[6px] border ${
                       signalingConnected
                         ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
                         : "border-[#242424] bg-[#121212] text-[#777777]"
                     }`}>
-                      <Laptop className="h-3.5 w-3.5" />
+                      <Laptop className="h-4 w-4 text-emerald-400 shrink-0" />
                       <div className="text-left font-mono">
-                        <div className="text-[10px] font-semibold text-[#ededed]">Peer A (Caller)</div>
-                        <div className="text-[9px] text-[#666666]">192.168.1.15:51200</div>
+                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1">
+                          <span>💻 Peer A (Caller)</span>
+                        </div>
+                        <div className="text-xs text-[#666666]">192.168.1.15:51200</div>
                       </div>
                       <span
                         data-testid="peer-a-state"
-                        className="text-[9px] font-mono px-1 rounded bg-black/60 text-emerald-400 ml-1 border border-emerald-500/30"
+                        className="text-xs font-mono px-1.5 py-0.5 rounded bg-black/60 text-emerald-400 ml-1.5 border border-emerald-500/30 font-semibold"
                       >
                         {peerAConnectionState}
                       </span>
                     </div>
 
                     {/* Rendezvous Status */}
-                    <div className="text-[10px] font-mono text-[#666666]">
+                    <div className="text-xs font-mono text-[#888888]">
                       {signalingPingDelivered ? (
                         <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          <span>Relay Ready</span>
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>✅ Relay Ready</span>
                         </span>
                       ) : (
-                        <span>Awaiting Ping</span>
+                        <span className="text-[#888888] flex items-center gap-1">
+                          <span>⏳</span>
+                          <span>Awaiting Ping</span>
+                        </span>
                       )}
                     </div>
 
                     {/* Peer B Node */}
-                    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-[6px] border ${
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-[6px] border ${
                       signalingConnected
                         ? "border-cyan-500/40 bg-cyan-950/20 text-cyan-300"
                         : "border-[#242424] bg-[#121212] text-[#777777]"
                     }`}>
-                      <Laptop className="h-3.5 w-3.5" />
+                      <Laptop className="h-4 w-4 text-cyan-400 shrink-0" />
                       <div className="text-left font-mono">
-                        <div className="text-[10px] font-semibold text-[#ededed]">Peer B (Callee)</div>
-                        <div className="text-[9px] text-[#666666]">10.0.0.42:62400</div>
+                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1">
+                          <span>💻 Peer B (Callee)</span>
+                        </div>
+                        <div className="text-xs text-[#666666]">10.0.0.42:62400</div>
                       </div>
                       <span
                         data-testid="peer-b-state"
-                        className="text-[9px] font-mono px-1 rounded bg-black/60 text-cyan-400 ml-1 border border-cyan-500/30"
+                        className="text-xs font-mono px-1.5 py-0.5 rounded bg-black/60 text-cyan-400 ml-1.5 border border-cyan-500/30 font-semibold"
                       >
                         {peerBConnectionState}
                       </span>
@@ -783,116 +844,140 @@ export const BeginnerLab: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] font-mono text-[#666666] border-t border-[#1e1e1e] pt-1">
-                  <span>Signaling Channel: WebSocket Full-Duplex</span>
-                  <span>Payload: JSON Text Control Frames</span>
+                <div className="flex items-center justify-between text-xs font-mono text-[#888888] border-t border-[#1e1e1e] pt-1">
+                  <span>📡 Signaling Channel: WebSocket Full-Duplex</span>
+                  <span>📦 Payload: JSON Text Control Frames</span>
                 </div>
               </div>
 
-              {/* BOTTOM: WEBSOCKET PROTOCOL STREAM + QUICK DATACHANNEL TEST DOCK (~48% height) */}
-              <div className="h-[48%] grid grid-cols-12 gap-2.5">
+              {/* BOTTOM: WEBSOCKET PROTOCOL STREAM + QUICK DATACHANNEL TEST DOCK */}
+              <div className="flex-1 min-h-0 grid grid-cols-12 gap-2.5">
                 {/* WebSocket Frames (Col 7) */}
-                <div className="col-span-12 lg:col-span-7 rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-2.5 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="col-span-12 lg:col-span-7 h-full min-h-0 rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-2.5 flex flex-col justify-between overflow-hidden shadow-sm">
                   <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1">
                     <div className="flex items-center gap-1.5">
-                      <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#ededed]">
-                        Live WebSocket Stream
+                      <Terminal className="h-4 w-4 text-emerald-400" />
+                      <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1">
+                        <span>📜</span>
+                        <span>Live WebSocket Stream</span>
                       </span>
                     </div>
-                    <span className="text-[9px] font-mono text-[#666666]">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#161616] text-[#888888] border border-[#222222]">
                       {wsFrames.length} Frames
                     </span>
                   </div>
 
-                  <div className="flex-1 min-h-0 my-1 overflow-y-auto rounded-[4px] bg-[#000000] p-1.5 space-y-1 font-mono text-[9px]">
+                  <div className="flex-1 min-h-0 my-1 overflow-y-auto rounded-[6px] bg-[#000000] p-2 space-y-2 border border-[#1a1a1a]">
                     {wsFrames.map((frame) => (
-                      <div key={frame.id} className="flex items-start gap-1.5 leading-tight">
-                        <span className="text-[#555555] shrink-0">{frame.timestamp}</span>
-                        <span className={`px-1 py-0.2 rounded-[2px] text-[8px] shrink-0 font-semibold border ${
-                          frame.direction === "A ➔ SRV"
-                            ? "bg-emerald-950/30 text-emerald-300 border-emerald-500/30"
-                            : frame.direction === "B ➔ SRV"
-                            ? "bg-cyan-950/30 text-cyan-300 border-cyan-500/30"
-                            : frame.direction === "A ➔ SRV ➔ B"
-                            ? "bg-purple-950/30 text-purple-300 border-purple-500/30"
-                            : "bg-[#181818] text-[#888888] border-[#282828]"
-                        }`}>
-                          {frame.direction}
-                        </span>
-                        <span className="text-[#ededed] break-all">{frame.payload}</span>
+                      <div key={frame.id} className="rounded-[6px] border border-[#222222] bg-[#0c0c0c] p-2 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <div className="flex items-center gap-1.5 font-mono">
+                            <span className="text-sm">{frame.emoji || "✉️"}</span>
+                            <span className={`px-2 py-0.5 rounded-[4px] text-xs font-bold border ${
+                              frame.direction === "A ➔ SRV"
+                                ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/40"
+                                : frame.direction === "B ➔ SRV"
+                                ? "bg-cyan-950/40 text-cyan-300 border-cyan-500/40"
+                                : frame.direction === "A ➔ SRV ➔ B"
+                                ? "bg-purple-950/40 text-purple-300 border-purple-500/40"
+                                : "bg-[#181818] text-amber-300 border-amber-500/30"
+                            }`}>
+                              {frame.direction}
+                            </span>
+                            <span className="font-semibold text-[#ededed] text-xs sm:text-sm">{frame.title}</span>
+                          </div>
+                          <span className="text-[#666666] font-mono text-xs">{frame.timestamp}</span>
+                        </div>
+
+                        <p className="text-xs text-[#a8a8a8] leading-relaxed pl-1.5 border-l-2 border-cyan-500/40">
+                          {frame.explanation}
+                        </p>
+
+                        <div className="font-mono text-xs text-cyan-300 bg-black/80 px-2 py-1.5 rounded border border-[#202020] select-all overflow-x-auto whitespace-pre-wrap break-all">
+                          {frame.payload}
+                        </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="text-[9px] font-mono text-[#666666] pt-1 border-t border-[#1a1a1a]">
-                    Server only forwards signaling metadata; media never flows here.
+                  <div className="text-xs font-mono text-[#888888] pt-1.5 border-t border-[#1a1a1a] flex items-center gap-1">
+                    <span>ℹ️</span>
+                    <span>Server only forwards signaling metadata; media never flows here.</span>
                   </div>
                 </div>
 
                 {/* Quick DataChannel Verification Dock (Col 5) */}
-                <div className="col-span-12 lg:col-span-5 rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-2.5 flex flex-col justify-between overflow-hidden shadow-sm">
-                  <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1">
-                    <div className="flex items-center gap-1">
-                      <MessageSquare className="h-3 w-3 text-cyan-400" />
-                      <span className="text-[11px] font-semibold text-[#ededed]">P2P Data Channel</span>
+                <div className="col-span-12 lg:col-span-5 h-full min-h-0 rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-2.5 flex flex-col justify-between overflow-hidden shadow-sm">
+                  <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <MessageSquare className="h-4 w-4 text-cyan-400" />
+                      <span className="text-xs sm:text-sm font-semibold text-[#ededed] flex items-center gap-1">
+                        <span>💬</span>
+                        <span>P2P Data Channel</span>
+                      </span>
                     </div>
-                    <span className="text-[9px] font-mono text-emerald-400">Direct Pipe</span>
+                    <span className="text-xs font-mono text-emerald-400 font-semibold flex items-center gap-1">
+                      <span>⚡</span>
+                      <span>Direct Pipe</span>
+                    </span>
                   </div>
 
                   <div
                     data-testid="dc-log"
-                    className="flex-1 min-h-0 my-1 overflow-y-auto rounded bg-[#000000] p-1.5 text-[9px] font-mono text-[#a1a1a1] space-y-1"
+                    className="flex-1 min-h-0 my-1.5 overflow-y-auto rounded-[6px] bg-[#000000] p-2 text-xs font-mono text-[#ededed] space-y-1.5 border border-[#1a1a1a]"
                   >
                     {dataChannelMessages.length === 0 ? (
-                      <span className="text-[#555555] italic">Direct wire activates once connected</span>
+                      <div className="text-[#666666] italic flex items-center gap-1.5 py-4 justify-center text-xs">
+                        <span>🔒</span>
+                        <span>Direct wire activates once connected</span>
+                      </div>
                     ) : (
                       dataChannelMessages.map((m, i) => (
-                        <div key={i} className="text-[#ededed]">
-                          <span className="text-cyan-400 font-semibold">[{m.from}]: </span>
-                          <span>{m.text}</span>
+                        <div key={i} className="text-xs leading-normal">
+                          <span className="text-cyan-400 font-bold">[{m.from}]: </span>
+                          <span className="text-[#ededed]">{m.text}</span>
                         </div>
                       ))
                     )}
                   </div>
 
                   {/* Dual quick send controls */}
-                  <div className="space-y-1 pt-1 border-t border-[#1e1e1e]">
-                    <div className="flex gap-1">
+                  <div className="space-y-1.5 pt-1.5 border-t border-[#1e1e1e]">
+                    <div className="flex gap-1.5">
                       <input
                         type="text"
-                        placeholder="Send from A..."
+                        placeholder="✉️ Send from A..."
                         value={messageInputA}
                         onChange={(e) => setMessageInputA(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSendA()}
                         data-testid="input-msg-a"
-                        className="h-6 flex-1 rounded border border-[#242424] bg-[#050505] px-1.5 text-[10px] font-mono text-[#ededed] outline-none"
+                        className="h-7 flex-1 rounded border border-[#242424] bg-[#050505] px-2 text-xs font-mono text-[#ededed] outline-none focus:border-cyan-500"
                       />
                       <button
                         type="button"
                         onClick={handleSendA}
                         data-testid="btn-send-a"
-                        className="h-6 px-2 rounded border border-[#242424] bg-[#141414] text-[10px] text-[#ededed]"
+                        className="h-7 px-3 rounded border border-[#242424] bg-[#141414] text-xs font-medium text-[#ededed] hover:border-[#404040] transition-colors"
                       >
                         Send
                       </button>
                     </div>
 
-                    <div className="flex gap-1">
+                    <div className="flex gap-1.5">
                       <input
                         type="text"
-                        placeholder="Send from B..."
+                        placeholder="✉️ Send from B..."
                         value={messageInputB}
                         onChange={(e) => setMessageInputB(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSendB()}
                         data-testid="input-msg-b"
-                        className="h-6 flex-1 rounded border border-[#242424] bg-[#050505] px-1.5 text-[10px] font-mono text-[#ededed] outline-none"
+                        className="h-7 flex-1 rounded border border-[#242424] bg-[#050505] px-2 text-xs font-mono text-[#ededed] outline-none focus:border-cyan-500"
                       />
                       <button
                         type="button"
                         onClick={handleSendB}
                         data-testid="btn-send-b"
-                        className="h-6 px-2 rounded border border-[#242424] bg-[#141414] text-[10px] text-[#ededed]"
+                        className="h-7 px-3 rounded border border-[#242424] bg-[#141414] text-xs font-medium text-[#ededed] hover:border-[#404040] transition-colors"
                       >
                         Send
                       </button>

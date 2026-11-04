@@ -53,13 +53,33 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     fullPage: false,
   });
 
-  // 3. Beginner Lab with React Bits (Desktop)
-  await page.setViewportSize({ width: 1280, height: 950 });
+  // 3. Beginner Lab with React Bits (Desktop) - Step 1 Initial
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await page.waitForSelector("text=WebRTC Learning Lab");
   await page.screenshot({
     path: path.join(screenshotsDir, "beginner-lab-react-bits-desktop.png"),
+    fullPage: false,
+  });
+
+  // Step 1 Active - Click Connect and Dispatch Ping to capture rich live frames
+  await page.getByTestId("btn-start-offer").click();
+  await page.locator("button:has-text('Send Ping')").click();
+  await page.waitForTimeout(1200);
+
+  // Ensure all containers are reset to top 0
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelectorAll('*').forEach((el) => {
+      if (el.scrollTop) el.scrollTop = 0;
+    });
+  });
+
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step1-active.png"),
     fullPage: false,
   });
 
