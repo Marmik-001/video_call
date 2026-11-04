@@ -240,6 +240,174 @@ a=setup:actpass`;
     },
   ];
 
+  // Step 3 ICE Candidates Pathfinder State
+  const [step3Tab, setStep3Tab] = useState<"candidates" | "pairs" | "anatomy">("candidates");
+  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState<number>(0);
+  const [selectedAnatomyIndex, setSelectedAnatomyIndex] = useState<number>(0);
+
+  const iceCandidateEntries = [
+    {
+      type: "host",
+      title: "Host Candidate (Local Interface)",
+      priority: "2,113,937,151",
+      latency: "< 1 ms",
+      badge: "Priority: 1st",
+      protocol: "UDP",
+      socket: "192.168.1.15:51200",
+      interfaceName: "en0 (Local Wi-Fi)",
+      plainEnglish: "Obtained directly from the operating system network card. Represents the laptop's private LAN socket.",
+      technicalDetail: "RFC 8445 §5.1.1. Assigned highest type preference (126). Delivers the lowest latency and highest throughput if both peers share the same Wi-Fi or corporate network.",
+      rfc: "RFC 8445 §5.1.1",
+      icon: <Laptop className="h-4 w-4 text-emerald-400" />,
+      tagColor: "border-emerald-500/30 bg-emerald-950/20 text-emerald-300",
+      role: "Same LAN / Subnet",
+    },
+    {
+      type: "srflx",
+      title: "Server Reflexive (STUN Public NAT)",
+      priority: "1,677,721,599",
+      latency: "~15-35 ms",
+      badge: "Priority: 2nd",
+      protocol: "UDP",
+      socket: "152.58.37.13:41987",
+      interfaceName: "NAT Gateway Pinhole",
+      plainEnglish: "Discovered by querying a STUN server: 'What is my public IP and port as seen outside my home router?'",
+      technicalDetail: "RFC 8489 STUN Binding Request. Punches an outbound translation mapping in the NAT firewall table. Used for direct peer-to-peer across different internet providers.",
+      rfc: "RFC 8489 STUN",
+      icon: <Globe className="h-4 w-4 text-purple-400" />,
+      tagColor: "border-purple-500/30 bg-purple-950/20 text-purple-300",
+      role: "Cross-Internet Direct",
+    },
+    {
+      type: "prflx",
+      title: "Peer Reflexive (Dynamic Port Binding)",
+      priority: "1,845,493,759",
+      latency: "~18-40 ms",
+      badge: "Dynamic",
+      protocol: "UDP",
+      socket: "152.58.37.13:44210",
+      interfaceName: "Symmetric NAT Shift",
+      plainEnglish: "Discovered on-the-fly during connectivity checks when packets arrive from an address/port different from the STUN binding.",
+      technicalDetail: "RFC 8445 §7.1.3. Occurs under symmetric NAT firewalls that reassign ports per destination socket. Assigned high preference (110).",
+      rfc: "RFC 8445 §7.1.3",
+      icon: <ArrowLeftRight className="h-4 w-4 text-cyan-400" />,
+      tagColor: "border-cyan-500/30 bg-cyan-950/20 text-cyan-300",
+      role: "Symmetric Reassignment",
+    },
+    {
+      type: "relay",
+      title: "Relay Candidate (TURN Cloud Proxy)",
+      priority: "16,777,215",
+      latency: "~60-120 ms",
+      badge: "Fallback",
+      protocol: "UDP/TLS",
+      socket: "turn.relay.lab:3478",
+      interfaceName: "TURN Server Allocation",
+      plainEnglish: "Allocated on a dedicated cloud server. Serves as a 100% reliable fallback when both peers are behind strict corporate firewalls.",
+      technicalDetail: "RFC 8656 TURN Allocate Request. Encrypted media packets are relayed through the server. Lowest type preference (0) due to server bandwidth overhead.",
+      rfc: "RFC 8656 TURN",
+      icon: <Server className="h-4 w-4 text-amber-400" />,
+      tagColor: "border-amber-500/30 bg-amber-950/20 text-amber-300",
+      role: "Guaranteed Tunnel",
+    },
+  ];
+
+  const candidatePairEntries = [
+    {
+      pairId: "Pair #1",
+      local: "Host (192.168.1.15:51200)",
+      remote: "Host (10.0.0.42:62400)",
+      priority: "9,120,443,100",
+      state: "Failed (Different Private Subnets)",
+      stateColor: "text-red-400 border-red-500/30 bg-red-950/20",
+      rtt: "Timeout",
+    },
+    {
+      pairId: "Pair #2",
+      local: "srflx (152.58.37.13:41987)",
+      remote: "srflx (152.58.37.13:36830)",
+      priority: "7,230,119,450",
+      state: "Succeeded (Nominated Pair • USE-CANDIDATE)",
+      stateColor: "text-emerald-400 border-emerald-500/30 bg-emerald-950/20 font-bold",
+      rtt: "24 ms",
+    },
+    {
+      pairId: "Pair #3",
+      local: "srflx (152.58.37.13:41987)",
+      remote: "Relay (turn.relay.lab:3478)",
+      priority: "1,890,204,110",
+      state: "Frozen (Not Needed)",
+      stateColor: "text-[#777777] border-[#262626] bg-[#141414]",
+      rtt: "Standby",
+    },
+    {
+      pairId: "Pair #4",
+      local: "Relay (turn.relay.lab:3478)",
+      remote: "Relay (turn.relay.lab:3478)",
+      priority: "72,110,400",
+      state: "Frozen (Not Needed)",
+      stateColor: "text-[#777777] border-[#262626] bg-[#141414]",
+      rtt: "Standby",
+    },
+  ];
+
+  const sdpAnatomyFields = [
+    {
+      token: "candidate:",
+      name: "SDP Attribute Prefix",
+      meaning: "Identifies this line as an ICE candidate declaration per RFC 5245 / RFC 8445.",
+      rfc: "RFC 8445 §5.1",
+    },
+    {
+      token: "2426751383",
+      name: "Foundation ID",
+      meaning: "Alphanumeric identifier unique to candidates with identical type, base IP, and STUN/TURN server. Optimizes pair checks.",
+      rfc: "RFC 8445 §5.1.1.1",
+    },
+    {
+      token: "1",
+      name: "Component ID",
+      meaning: "1 represents RTP media stream or SCTP data channel. (2 is used for RTCP if multiplexing is disabled).",
+      rfc: "RFC 8445 §5.1.1.2",
+    },
+    {
+      token: "udp",
+      name: "Transport Protocol",
+      meaning: "UDP is WebRTC's primary transport for lowest latency. TCP is only used as a fallback through TURN on port 443.",
+      rfc: "RFC 8445 §5.1.1.3",
+    },
+    {
+      token: "2113937151",
+      name: "Priority (32-bit uint)",
+      meaning: "Calculated via (2^24 * type_pref) + (2^8 * local_pref) + (256 - component). Higher numbers are evaluated first.",
+      rfc: "RFC 8445 §5.1.2.1",
+    },
+    {
+      token: "192.168.1.15",
+      name: "IP Address",
+      meaning: "The host network interface IP, public reflexive NAT IP, or TURN relay server IP.",
+      rfc: "RFC 8445 §5.1.1.4",
+    },
+    {
+      token: "51200",
+      name: "Port Number",
+      meaning: "The UDP port bound to the local media socket or the NAT translation table.",
+      rfc: "RFC 8445 §5.1.1.5",
+    },
+    {
+      token: "typ host",
+      name: "Candidate Type",
+      meaning: "Specifies whether this candidate is 'host' (LAN), 'srflx' (STUN), 'prflx', or 'relay' (TURN).",
+      rfc: "RFC 8445 §5.1.1.6",
+    },
+    {
+      token: "generation 0",
+      name: "ICE Generation Counter",
+      meaning: "Increments if an ICE restart is triggered due to network handover (e.g. switching from Wi-Fi to 5G).",
+      rfc: "RFC 5245 §4.1.1",
+    },
+  ];
+
   // Video Refs for Step 5
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -753,12 +921,12 @@ a=setup:actpass`;
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between border-b border-[#222222] pb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-cyan-500/30 bg-cyan-950/30 text-cyan-400 shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-purple-500/30 bg-purple-950/30 text-purple-400 shrink-0 shadow-[0_0_8px_rgba(168,85,247,0.2)]">
                       <Handshake className="h-4 w-4" />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <Cloud className="h-4 w-4 text-cyan-400" />
+                        <Cloud className="h-4 w-4 text-purple-400" />
                         <span className="text-sm sm:text-base font-bold text-[#ededed]">
                           Step 1 • The Matchmaker (Signaling)
                         </span>
@@ -766,16 +934,16 @@ a=setup:actpass`;
                       <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Discovery & Rendezvous</span>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 font-semibold">
-                    <Globe className="h-3.5 w-3.5 text-cyan-400" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                    <Globe className="h-3.5 w-3.5 text-purple-400" />
                     <span>WebSocket Online</span>
                   </span>
                 </div>
 
                 {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
-                <div className="rounded-[8px] border border-cyan-500/40 bg-gradient-to-r from-cyan-950/30 via-cyan-900/10 to-transparent p-2.5 space-y-1 shadow-sm">
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-cyan-300">
-                    <Target className="h-4 w-4 text-cyan-400" />
+                <div className="rounded-[8px] border border-purple-500/40 bg-gradient-to-r from-purple-950/30 via-purple-900/10 to-transparent p-2.5 space-y-1 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-300">
+                    <Target className="h-4 w-4 text-purple-400" />
                     <span>Why Are We Doing This?</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
@@ -1636,12 +1804,520 @@ a=setup:actpass`;
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : currentStep === 3 ? (
           /* ============================================================== */
-          /* STEPS 3-6: THE ACTIVE WEBRTC EXPERIMENTATION ARENA (BENTO) */
+          /* STEP 3: FINDING THE PATH (ICE CANDIDATES) (Morphing Bento)    */
           /* ============================================================== */
           <motion.div
-            key="steps-3-6-bento"
+            key="step-3-bento"
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 min-h-0 h-full w-full grid grid-cols-12 grid-rows-1 gap-2.5"
+          >
+            {/* LEFT HERO: BASELINE EXPLANATION & ACTION DECK (Col 5) */}
+            <div className="col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col justify-between rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 shadow-sm overflow-hidden">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between border-b border-[#222222] pb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-purple-500/30 bg-purple-950/30 text-purple-400 shrink-0 shadow-[0_0_8px_rgba(168,85,247,0.2)]">
+                      <Network className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Radio className="h-4 w-4 text-purple-400" />
+                        <span className="text-sm sm:text-base font-bold text-[#ededed]">
+                          Step 3 • Finding the Path (ICE Candidates)
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Network Path Hunting & Hole Punching</span>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                    <Zap className="h-3.5 w-3.5 text-purple-400" />
+                    <span>RFC 8445 • ICE</span>
+                  </span>
+                </div>
+
+                {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
+                <div className="rounded-[8px] border border-purple-500/40 bg-gradient-to-r from-purple-950/30 via-purple-900/10 to-transparent p-2.5 space-y-1 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-300">
+                    <Target className="h-4 w-4 text-purple-400" />
+                    <span>Why Are We Doing This?</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
+                    Video codecs are agreed, but neither browser knows what physical wire connects them.
+                    ICE gathers every possible IP address and port (host LAN, STUN NAT pinholes, and TURN cloud relays) so the browsers can punch through firewalls and find the fastest route!
+                  </p>
+                </div>
+
+                {/* The Core Problem & Baseline */}
+                <div className="space-y-1">
+                  <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
+                    <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span>The NAT & Firewall Blackout</span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
+                    Your laptop's local Wi-Fi IP (<code className="text-emerald-300">192.168.1.15</code>) is completely invisible to the outside world. Home routers use NAT to disguise internal devices. <strong className="text-[#ededed]">ICE collects candidate network coordinates</strong> across LAN, STUN, and TURN so peers can find a working path.
+                  </p>
+                </div>
+
+                {/* Mental Model & Analogy */}
+                <div className="rounded-[8px] border border-[#222222] bg-[#121212] p-2.5 space-y-1 text-xs sm:text-sm">
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                    <span>Mental Model & Analogy</span>
+                  </span>
+                  <p className="text-[#ededed] italic leading-relaxed">
+                    "You want a friend in another city to visit your apartment. You give them: 1. Your Wi-Fi LAN address (if they are in the same room), 2. Your building's street address & buzz code (STUN), and 3. A trusted 24/7 postal concierge locker (TURN) if the front gate is locked."
+                  </p>
+                </div>
+
+                {/* The WebRTC Rule */}
+                <div className="text-xs sm:text-sm font-mono text-[#888888] space-y-0.5 border-l-2 border-purple-500/60 pl-2.5 py-0.5">
+                  <p className="flex items-start gap-1.5">
+                    <Key className="h-3.5 w-3.5 text-purple-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-[#ededed]">Key Protocol Fact:</strong> WebRTC uses <span className="underline decoration-purple-500 text-purple-200">Trickle ICE (RFC 8838)</span>. Candidates are streamed one-by-one over signaling as soon as the OS finds them, avoiding 8-second call setup delays!
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Numbered Action Directives */}
+              <div className="space-y-2 pt-2 border-t border-[#1e1e1e]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Interactive Directives</span>
+                  </span>
+                  <span className="text-xs font-mono text-purple-400 font-medium">Trickle Gathering</span>
+                </div>
+
+                <div className="flex gap-2">
+                  <SpecularButton
+                    onClick={handleStartHandshake}
+                    data-testid="btn-start-offer"
+                    className="flex-1 h-9 text-xs sm:text-sm font-semibold"
+                  >
+                    <Network className="h-3.5 w-3.5 mr-1 text-purple-400" />
+                    <span>
+                      {gatheredCandidates.length > 0
+                        ? `Candidates Gathered (${gatheredCandidates.length} Active)`
+                        : "1. Gather All Candidate Routes"}
+                    </span>
+                  </SpecularButton>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCandidateIndex((prev) => (prev + 1) % iceCandidateEntries.length)}
+                    className="px-3.5 h-9 rounded-[6px] border border-[#242424] bg-[#141414] text-xs sm:text-sm font-mono text-[#ededed] hover:border-[#404040] hover:bg-[#1a1a1a] transition-all flex items-center gap-1.5"
+                    title="Inspect next ICE candidate"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Candidate ({selectedCandidateIndex + 1}/{iceCandidateEntries.length})</span>
+                  </button>
+                </div>
+
+                {/* Action Reaction Feed */}
+                <div className="rounded-[8px] border border-[#262626] bg-[#111111] p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span className="text-xs sm:text-sm font-semibold text-[#ededed]">
+                        {lastReaction.title}
+                      </span>
+                    </div>
+                    {lastReaction.badge && (
+                      <span className="rounded bg-[#1c1c1c] px-2 py-0.5 text-xs font-mono text-purple-300 border border-[#2c2c2c]">
+                        {lastReaction.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] font-mono leading-relaxed">
+                    {lastReaction.detail}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: MULTI-PATH ROUTING RADAR & GATHERED CANDIDATES X-RAY (Col 7) */}
+            <div className="col-span-12 lg:col-span-7 h-full min-h-0 flex flex-col gap-2.5">
+              {/* TOP: MULTI-PATH ROUTING RADAR (Height ~40%) */}
+              <div className="h-[40%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
+                      <span>Multi-Path Routing Radar (ICE Connectivity Checks)</span>
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>{peerAConnectionState === "connected" ? "Direct P2P Verified" : "Checking Pairs"}</span>
+                  </span>
+                </div>
+
+                {/* Multi-route pathway visualization */}
+                <div className="relative my-auto flex items-center justify-between px-6 py-1">
+                  {/* Peer A Node */}
+                  <div className="flex flex-col items-center gap-1 z-10">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] border border-purple-500/40 bg-purple-950/20 text-purple-300">
+                      <Laptop className="h-4 w-4 text-purple-400 shrink-0" />
+                      <div className="text-left font-mono">
+                        <div className="text-xs font-semibold text-[#ededed]">Peer A (Offerer)</div>
+                        <div className="text-[11px] text-[#888888]">192.168.1.15</div>
+                      </div>
+                      <span
+                        data-testid="peer-a-state"
+                        className="text-xs font-mono px-1.5 py-0.5 rounded bg-black/60 text-purple-300 ml-1.5 border border-purple-500/30 font-semibold"
+                      >
+                        {peerAConnectionState}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tri-Path Wire Radar (LAN, STUN, TURN) */}
+                  <div className="flex-1 flex flex-col justify-around h-24 py-1 mx-3">
+                    {/* Path 1: Host LAN */}
+                    <div className="flex items-center w-full gap-2">
+                      <div className="flex-1 h-[1.5px] bg-[#222222]" />
+                      <span className="px-2 py-0.5 rounded bg-[#111111] text-[10px] font-mono text-[#666666] border border-[#222222] shrink-0">
+                        Host LAN (Different Subnets ➔ Unreachable)
+                      </span>
+                      <div className="flex-1 h-[1.5px] bg-[#222222]" />
+                    </div>
+
+                    {/* Path 2: STUN Reflexive Pinhole (Active Nominated Path) */}
+                    <div className="relative flex items-center w-full gap-2">
+                      <div className="flex-1 h-[2px] bg-gradient-to-r from-purple-500/40 via-purple-400 to-purple-500/40 relative">
+                        <motion.div
+                          className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,1)] absolute -top-0.5"
+                          animate={{ left: ["0%", "100%"] }}
+                          transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+                        />
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-[5px] bg-purple-950/60 text-[10px] font-mono text-purple-200 border border-purple-500/40 shrink-0 shadow-[0_0_8px_rgba(168,85,247,0.3)] flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                        <span>STUN srflx Pinhole (Nominated • 24ms)</span>
+                      </span>
+                      <div className="flex-1 h-[2px] bg-gradient-to-r from-purple-500/40 via-purple-400 to-purple-500/40" />
+                    </div>
+
+                    {/* Path 3: TURN Cloud Relay */}
+                    <div className="flex items-center w-full gap-2">
+                      <div className="flex-1 h-[1.5px] bg-[#222222]" />
+                      <span className="px-2 py-0.5 rounded bg-[#111111] text-[10px] font-mono text-[#666666] border border-[#222222] shrink-0">
+                        TURN Cloud Relay (Standby Fallback)
+                      </span>
+                      <div className="flex-1 h-[1.5px] bg-[#222222]" />
+                    </div>
+                  </div>
+
+                  {/* Peer B Node */}
+                  <div className="flex flex-col items-center gap-1 z-10">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] border border-cyan-500/40 bg-cyan-950/20 text-cyan-300">
+                      <Laptop className="h-4 w-4 text-cyan-400 shrink-0" />
+                      <div className="text-left font-mono">
+                        <div className="text-xs font-semibold text-[#ededed]">Peer B (Callee)</div>
+                        <div className="text-[11px] text-[#888888]">10.0.0.42</div>
+                      </div>
+                      <span
+                        data-testid="peer-b-state"
+                        className="text-xs font-mono px-1.5 py-0.5 rounded bg-black/60 text-cyan-400 ml-1.5 border border-cyan-500/30 font-semibold"
+                      >
+                        {peerBConnectionState}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom 4 Status Tiles */}
+                <div className="grid grid-cols-4 gap-2 pt-1 border-t border-[#1e1e1e]">
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Zap className="h-3 w-3 text-purple-400" />
+                      <span>ICE Transport</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">Trickle (RFC 8838)</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <ShieldCheck className="h-3 w-3 text-emerald-400" />
+                      <span>Highest Priority</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">Host (2,113,937,151)</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <CheckCircle2 className="h-3 w-3 text-cyan-400" />
+                      <span>Nominated Pair</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">srflx ➔ srflx</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Activity className="h-3 w-3 text-amber-400" />
+                      <span>ICE State</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">
+                      {peerAConnectionState === "connected" ? "Connected" : "Hunting Path"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BOTTOM: GATHERED CANDIDATES DEEP X-RAY (Height ~60%) */}
+              <div className="h-[60%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
+                      <span>Gathered Candidates</span>
+                    </span>
+                  </div>
+
+                  {/* Mode Switcher Tabs */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center rounded-[6px] bg-[#141414] p-0.5 border border-[#222222]">
+                      <button
+                        type="button"
+                        onClick={() => setStep3Tab("candidates")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step3Tab === "candidates"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>Decoded Candidates</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep3Tab("pairs")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step3Tab === "pairs"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                        <span>Pair Check Matrix</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep3Tab("anatomy")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step3Tab === "anatomy"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <FileCode className="h-3.5 w-3.5" />
+                        <span>SDP Line Anatomy</span>
+                      </button>
+                    </div>
+
+                    <span className="text-xs font-mono px-2 py-1 rounded-[6px] border border-[#242424] bg-[#141414] text-[#888888]">
+                      {iceCandidateEntries.length} Types
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tab Content Display */}
+                <div className="flex-1 min-h-0 pt-2 overflow-hidden">
+                  {/* TAB 1: DECODED CANDIDATES */}
+                  {step3Tab === "candidates" && (
+                    <div className="h-full grid grid-cols-12 gap-2.5">
+                      {/* Left Sub-Col: List of 4 Candidate Types */}
+                      <div className="col-span-5 h-full overflow-y-auto space-y-1.5 pr-1">
+                        {iceCandidateEntries.map((cand, idx) => (
+                          <button
+                            key={cand.type}
+                            type="button"
+                            onClick={() => setSelectedCandidateIndex(idx)}
+                            className={`w-full text-left rounded-[6px] p-2 border transition-all flex flex-col gap-1 ${
+                              selectedCandidateIndex === idx
+                                ? "border-purple-500/50 bg-purple-950/20 text-[#ededed] shadow-sm"
+                                : "border-[#202020] bg-[#0d0d0d] text-[#888888] hover:border-[#333333] hover:text-[#ededed]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                {cand.icon}
+                                <span className="font-semibold text-xs text-[#ededed]">{cand.title}</span>
+                              </div>
+                              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${cand.tagColor}`}>
+                                {cand.badge}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] font-mono text-[#888888]">
+                              <span className="text-purple-300 font-semibold">{cand.socket}</span>
+                              <span>{cand.latency}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Right Sub-Col: Deep Candidate Breakdown Card */}
+                      <div className="col-span-7 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#0c0c0c] p-3 space-y-2.5">
+                        {(() => {
+                          const active = iceCandidateEntries[selectedCandidateIndex] || iceCandidateEntries[0];
+                          return (
+                            <>
+                              <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                                <div className="flex items-center gap-2">
+                                  {active.icon}
+                                  <span className="font-semibold text-sm text-[#ededed]">{active.title}</span>
+                                </div>
+                                <span className="text-xs font-mono px-2 py-0.5 rounded bg-purple-950/40 text-purple-300 border border-purple-500/30">
+                                  {active.rfc}
+                                </span>
+                              </div>
+
+                              {/* Candidate Socket & Priority Box */}
+                              <div className="rounded-[6px] bg-black/80 border border-[#222222] p-2 font-mono text-xs flex items-center justify-between">
+                                <span className="text-purple-300 select-all font-semibold">{active.socket}</span>
+                                <span className="text-[#888888]">
+                                  Priority: <strong className="text-emerald-400">{active.priority}</strong>
+                                </span>
+                              </div>
+
+                              {/* Plain-English Translation */}
+                              <div className="space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                                  <Info className="h-3.5 w-3.5 text-cyan-400" />
+                                  <span>Plain-English Translation</span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed pl-2 border-l-2 border-purple-500/60">
+                                  {active.plainEnglish}
+                                </p>
+                              </div>
+
+                              {/* Technical Detail & RFC Note */}
+                              <div className="space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                                  <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+                                  <span>RFC Specification & Priority Formula</span>
+                                </div>
+                                <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                                  {active.technicalDetail}
+                                </p>
+                              </div>
+
+                              {/* Target Topology */}
+                              <div className="rounded-[6px] border border-cyan-500/20 bg-cyan-950/10 p-2 space-y-0.5">
+                                <div className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                                  <Network className="h-3.5 w-3.5 text-cyan-400" />
+                                  <span>Best Suited Network Scenario</span>
+                                </div>
+                                <p className="text-xs text-[#a1a1a1] font-mono">
+                                  {active.role} • Typical Round-Trip Latency: <strong className="text-[#ededed]">{active.latency}</strong>
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: CANDIDATE PAIR MATRIX */}
+                  {step3Tab === "pairs" && (
+                    <div className="h-full overflow-y-auto space-y-2">
+                      <div className="grid grid-cols-12 gap-2 text-xs font-mono font-semibold text-[#888888] pb-1 border-b border-[#222222]">
+                        <div className="col-span-2">Pair #</div>
+                        <div className="col-span-3 text-purple-300">Local Candidate (A)</div>
+                        <div className="col-span-3 text-cyan-300">Remote Candidate (B)</div>
+                        <div className="col-span-4 text-emerald-400">STUN Check State & RTT</div>
+                      </div>
+
+                      {candidatePairEntries.map((pair, i) => (
+                        <div
+                          key={i}
+                          className="grid grid-cols-12 gap-2 rounded-[6px] border border-[#1e1e1e] bg-[#0c0c0c] p-2 text-xs font-mono items-center"
+                        >
+                          <div className="col-span-2 text-[#ededed] font-semibold">{pair.pairId}</div>
+                          <div className="col-span-3 text-purple-300 bg-purple-950/20 px-2 py-1 rounded border border-purple-500/20 truncate">
+                            {pair.local}
+                          </div>
+                          <div className="col-span-3 text-cyan-300 bg-cyan-950/20 px-2 py-1 rounded border border-cyan-500/20 truncate">
+                            {pair.remote}
+                          </div>
+                          <div className="col-span-4 flex items-center justify-between">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${pair.stateColor}`}>
+                              {pair.state}
+                            </span>
+                            <span className="text-[11px] text-[#888888] shrink-0 font-bold">{pair.rtt}</span>
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="text-xs font-mono text-[#888888] p-2 rounded bg-black/60 border border-[#1a1a1a] flex items-center gap-1.5">
+                        <Info className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                        <span>Pair states follow the 4-state check machine: <strong>Frozen</strong> ➔ <strong>Waiting</strong> ➔ <strong>In-Progress</strong> ➔ <strong>Succeeded</strong> (USE-CANDIDATE nomination).</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: SDP LINE ANATOMY ANALYZER */}
+                  {step3Tab === "anatomy" && (
+                    <div className="h-full flex flex-col gap-2">
+                      {/* Interactive Token Strip */}
+                      <div className="rounded-[6px] border border-[#202020] bg-black/90 p-2.5">
+                        <span className="text-[10px] font-mono uppercase text-[#777777] block mb-1">Click any token to dissect its RFC 8445 field:</span>
+                        <div className="flex flex-wrap gap-1 font-mono text-xs">
+                          {sdpAnatomyFields.map((field, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setSelectedAnatomyIndex(idx)}
+                              className={`px-2 py-1 rounded-[4px] border transition-all ${
+                                selectedAnatomyIndex === idx
+                                  ? "bg-purple-950/60 border-purple-500 text-purple-200 font-bold shadow-[0_0_8px_rgba(168,85,247,0.4)]"
+                                  : "bg-[#141414] border-[#252525] text-purple-300 hover:border-[#444444]"
+                              }`}
+                            >
+                              {field.token}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Selected Field Explainer */}
+                      <div className="flex-1 min-h-0 rounded-[6px] border border-purple-500/30 bg-purple-950/10 p-3 space-y-1.5 overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-purple-500/20 pb-1">
+                          <span className="font-semibold text-xs text-[#ededed] font-mono">
+                            Token: <code className="text-purple-300 bg-black/60 px-1.5 py-0.5 rounded border border-purple-500/30">{sdpAnatomyFields[selectedAnatomyIndex].token}</code>
+                          </span>
+                          <span className="text-xs font-mono px-2 py-0.5 rounded bg-purple-950/50 text-purple-300 border border-purple-500/30">
+                            {sdpAnatomyFields[selectedAnatomyIndex].rfc}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-purple-200">
+                          {sdpAnatomyFields[selectedAnatomyIndex].name}
+                        </div>
+                        <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
+                          {sdpAnatomyFields[selectedAnatomyIndex].meaning}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          /* ============================================================== */
+          /* STEPS 4-6: THE ACTIVE WEBRTC EXPERIMENTATION ARENA (BENTO)     */
+          /* ============================================================== */
+          <motion.div
+            key="steps-4-6-bento"
             layout
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

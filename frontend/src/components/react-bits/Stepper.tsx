@@ -46,7 +46,7 @@ export const Stepper: React.FC<StepperProps> = ({
               {isActive && (
                 <motion.div
                   layoutId="active-stepper-pill"
-                  className="absolute inset-0 rounded-[6px] border border-[#404040] bg-[#171717] -z-10 shadow-sm"
+                  className="absolute inset-0 rounded-[6px] border border-purple-500/50 bg-gradient-to-r from-purple-950/40 via-[#171717] to-purple-950/20 -z-10 shadow-[0_0_12px_rgba(168,85,247,0.15)]"
                   transition={{ type: "spring", stiffness: 350, damping: 30 }}
                 />
               )}
@@ -54,9 +54,9 @@ export const Stepper: React.FC<StepperProps> = ({
               <span
                 className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-semibold ${
                   isActive
-                    ? "bg-[#ededed] text-black"
+                    ? "bg-purple-400 text-black shadow-[0_0_8px_rgba(192,132,252,0.6)]"
                     : isCompleted
-                    ? "bg-[#262626] text-[#ededed]"
+                    ? "bg-purple-950/50 text-purple-300 border border-purple-500/30"
                     : "bg-[#171717] text-[#666666]"
                 }`}
               >

@@ -6,6 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 test("capture styleguide screenshots at desktop and mobile viewports", async ({ page }) => {
+  test.setTimeout(90000);
   const screenshotsDir = path.resolve(__dirname, "../../docs/screenshots");
 
   // 1. Desktop 1280x900
@@ -121,7 +122,43 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     fullPage: false,
   });
 
-  // 5. Beginner Lab with React Bits (Mobile)
+  // 5. Step 3 ICE Candidates Pathfinder Bento
+  await page.locator("header").getByRole("button", { name: "Next" }).click();
+  await page.waitForSelector("text=Finding the Path (ICE Candidates)");
+  await page.waitForTimeout(600);
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelectorAll('*').forEach((el) => {
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    });
+  });
+
+  // Capture Step 3 Active: Decoded Candidates
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step3-active-candidates.png"),
+    fullPage: false,
+  });
+
+  // Switch to Pair Check Matrix
+  await page.locator("button:has-text('Pair Check Matrix')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step3-active-pairs.png"),
+    fullPage: false,
+  });
+
+  // Switch to SDP Line Anatomy
+  await page.locator("button:has-text('SDP Line Anatomy')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step3-active-anatomy.png"),
+    fullPage: false,
+  });
+
+  // 6. Beginner Lab with React Bits (Mobile)
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: path.join(screenshotsDir, "beginner-lab-react-bits-mobile.png"),
