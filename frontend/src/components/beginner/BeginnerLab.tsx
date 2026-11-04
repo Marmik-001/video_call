@@ -35,6 +35,15 @@ import {
   Sparkles,
   Package,
   Info,
+  FileCode,
+  ArrowLeftRight,
+  ShieldCheck,
+  GitCompare,
+  Cpu,
+  Copy,
+  CheckCheck,
+  Eye,
+  BookOpen,
 } from "lucide-react";
 import { useLabStore, type CandidateInfo } from "@/store/labStore";
 import { loopbackService } from "@/services/loopback.service";
@@ -130,6 +139,106 @@ export const BeginnerLab: React.FC = () => {
     badge: "INITIAL",
     timestamp: new Date().toLocaleTimeString(),
   });
+
+  // Step 2 SDP Business Card Inspector State
+  const [step2Tab, setStep2Tab] = useState<"decoded" | "diff" | "raw">("decoded");
+  const [selectedSdpIndex, setSelectedSdpIndex] = useState<number>(0);
+  const [copiedSdp, setCopiedSdp] = useState(false);
+
+  const handleCopySdp = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedSdp(true);
+    setTimeout(() => setCopiedSdp(false), 2000);
+  };
+
+  const defaultSampleSdp = `v=0
+o=- 4611731400431189076 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE 0 1
+m=video 9 UDP/TLS/RTP/SAVPF 96 97
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=rtpmap:96 VP8/90000
+a=rtpmap:97 H264/90000
+a=setup:actpass
+a=mid:0
+a=sendrecv
+a=fingerprint:sha-256 3F:2B:6A:19:9C:F8:71:0D:39:E1:94:4B:B3:68:57:34:B7:22:98:31:DE:6B:41:22:90:5E:2B:10:9C:23:42:01
+m=application 9 UDP/DTLS/SCTP webrtc-datachannel
+c=IN IP4 0.0.0.0
+a=mid:1
+a=sctp-port:5000
+a=setup:actpass`;
+
+  const sdpOfferDecodedEntries = [
+    {
+      prefix: "m=video",
+      field: "m=video 9 UDP/TLS/RTP/SAVPF 96 97",
+      title: "Video Stream Declaration",
+      plainEnglish: "Peer A asks to transmit video. Port 9 signifies dynamic port negotiation via ICE candidates.",
+      technicalDetail: "RTP/SAVPF mandates Secure RTP with RTCP feedback (RFC 5124) for lost frame retransmission and bandwidth probes.",
+      icon: <Video className="h-4 w-4 text-cyan-400" />,
+      category: "Media",
+      badge: "RFC 4566",
+      answerResponse: "Peer B accepts video stream on dynamic ICE port.",
+    },
+    {
+      prefix: "a=rtpmap:96",
+      field: "a=rtpmap:96 VP8/90000",
+      title: "VP8 Video Codec (Preferred)",
+      plainEnglish: "Peer A prefers Google VP8 compression at a 90,000 Hz clock rate (standard 30-60 fps web video).",
+      technicalDetail: "Dynamic payload type 96 is bound to the VP8 video compression standard (RFC 7741).",
+      icon: <Cpu className="h-4 w-4 text-emerald-400" />,
+      category: "Codec",
+      badge: "RFC 7741",
+      answerResponse: "Peer B confirms VP8 support and selects payload 96 as primary decoder.",
+    },
+    {
+      prefix: "a=rtpmap:97",
+      field: "a=rtpmap:97 H264/90000",
+      title: "H.264 Video Codec (Fallback)",
+      plainEnglish: "Peer A provides MPEG-4 AVC fallback for Safari and devices with dedicated H.264 hardware chips.",
+      technicalDetail: "Payload type 97 provides interoperability with hardware-accelerated AVC decoders (RFC 6184).",
+      icon: <Cpu className="h-4 w-4 text-purple-400" />,
+      category: "Codec",
+      badge: "RFC 6184",
+      answerResponse: "Peer B notes H.264 fallback but selects primary VP8 match.",
+    },
+    {
+      prefix: "m=application",
+      field: "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+      title: "P2P Data Channel (SCTP)",
+      plainEnglish: "Peer A declares a direct bidirectional channel for real-time text chat, file chunks, or binary game state.",
+      technicalDetail: "Runs Stream Control Transmission Protocol (SCTP) inside the DTLS tunnel (RFC 8831).",
+      icon: <MessageSquare className="h-4 w-4 text-cyan-400" />,
+      category: "DataChannel",
+      badge: "RFC 8831",
+      answerResponse: "Peer B confirms data channel support on local SCTP port 5000.",
+    },
+    {
+      prefix: "a=fingerprint",
+      field: "a=fingerprint:sha-256 3F:2B:6A:19:9C:...",
+      title: "DTLS Security Certificate Fingerprint",
+      plainEnglish: "Peer A's cryptographic cert thumbprint. Both browsers verify this fingerprint to block eavesdroppers.",
+      technicalDetail: "SHA-256 hash of Peer A's self-signed X.509 certificate used during TLS key exchange (RFC 8122).",
+      icon: <ShieldCheck className="h-4 w-4 text-emerald-400" />,
+      category: "Security",
+      badge: "RFC 8122",
+      answerResponse: "Peer B validates fingerprint against incoming DTLS ClientHello.",
+    },
+    {
+      prefix: "a=setup",
+      field: "a=setup:actpass",
+      title: "DTLS Role Proposal (Actpass)",
+      plainEnglish: "Peer A is flexible: 'I can either act as client or server during our DTLS encryption handshake.'",
+      technicalDetail: "'actpass' allows the answerer (Peer B) to decide whether to initiate or accept the DTLS handshake (RFC 4145).",
+      icon: <ArrowLeftRight className="h-4 w-4 text-amber-400" />,
+      category: "Network",
+      badge: "RFC 4145",
+      answerResponse: "Peer B selects 'setup:active', acting as the DTLS client.",
+    },
+  ];
 
   // Video Refs for Step 5
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -1034,12 +1143,505 @@ export const BeginnerLab: React.FC = () => {
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : currentStep === 2 ? (
           /* ============================================================== */
-          /* STEPS 2-6: THE ACTIVE WEBRTC EXPERIMENTATION ARENA (BENTO) */
+          /* STEP 2: THE BUSINESS CARD (SDP OFFER / ANSWER) (Morphing Bento) */
           /* ============================================================== */
           <motion.div
-            key="steps-2-6-bento"
+            key="step-2-bento"
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 min-h-0 h-full w-full grid grid-cols-12 grid-rows-1 gap-2.5"
+          >
+            {/* LEFT HERO: BASELINE EXPLANATION & ACTION DECK (Col 5) */}
+            <div className="col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col justify-between rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 shadow-sm overflow-hidden">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between border-b border-[#222222] pb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-purple-500/30 bg-purple-950/30 text-purple-400 shrink-0">
+                      <FileCode className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <ScrollText className="h-4 w-4 text-purple-400" />
+                        <span className="text-sm sm:text-base font-bold text-[#ededed]">
+                          Step 2 • The Business Card (SDP Offer / Answer)
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Capability Negotiation & Media Contract</span>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold">
+                    <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+                    <span>RFC 8829 • JSEP</span>
+                  </span>
+                </div>
+
+                {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
+                <div className="rounded-[8px] border border-purple-500/40 bg-gradient-to-r from-purple-950/30 via-purple-900/10 to-transparent p-2.5 space-y-1 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-300">
+                    <Target className="h-4 w-4 text-purple-400" />
+                    <span>Why Are We Doing This?</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
+                    Before sending encrypted video or data, both browsers must legally agree on codecs, crypto fingerprints, and media streams.
+                    They write this down in an SDP text contract — the Caller sends an <strong className="text-purple-300">Offer</strong>, and the Callee replies with an <strong className="text-cyan-300">Answer</strong>!
+                  </p>
+                </div>
+
+                {/* The Core Problem & Baseline */}
+                <div className="space-y-1">
+                  <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
+                    <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span>The Codec Compatibility Dilemma</span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
+                    Browser A might support VP8 and AV1, while Browser B only supports H.264. If A transmits VP8 without checking, B crashes or renders black frames. <strong className="text-[#ededed]">SDP negotiation ensures both peers agree on their highest mutual capability</strong> before transmitting media.
+                  </p>
+                </div>
+
+                {/* Mental Model & Analogy */}
+                <div className="rounded-[8px] border border-[#222222] bg-[#121212] p-2.5 space-y-1 text-xs sm:text-sm">
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                    <span>Mental Model & Analogy</span>
+                  </span>
+                  <p className="text-[#ededed] italic leading-relaxed">
+                    "Before starting an international business deal, two executives swap contracts: 'I speak English and French, I use 256-bit encryption, and I listen on port 5000. Do you accept?'"
+                  </p>
+                </div>
+
+                {/* The WebRTC Rule */}
+                <div className="text-xs sm:text-sm font-mono text-[#888888] space-y-0.5 border-l-2 border-purple-500/60 pl-2.5 py-0.5">
+                  <p className="flex items-start gap-1.5">
+                    <Key className="h-3.5 w-3.5 text-purple-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-[#ededed]">Key Protocol Fact:</strong> WebRTC uses the <span className="underline decoration-purple-500 text-purple-200">JSEP</span> state machine: <code className="text-purple-300">createOffer()</code> ➔ <code className="text-purple-300">setLocalDescription()</code> ➔ Signaling ➔ <code className="text-purple-300">setRemoteDescription()</code> ➔ <code className="text-purple-300">createAnswer()</code>.
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Numbered Action Directives */}
+              <div className="space-y-2 pt-2 border-t border-[#1e1e1e]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Interactive Directives</span>
+                  </span>
+                  <span className="text-xs font-mono text-purple-400 font-medium">JSEP Negotiation</span>
+                </div>
+
+                <div className="flex gap-2">
+                  <SpecularButton
+                    onClick={handleStartHandshake}
+                    data-testid="btn-start-offer"
+                    className="flex-1 h-9 text-xs sm:text-sm font-semibold"
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-1 text-purple-400" />
+                    <span>
+                      {sdpOffer && sdpAnswer
+                        ? "Negotiation Complete (VP8 + Opus)"
+                        : sdpOffer
+                        ? "Offer Sent • Awaiting Answer"
+                        : "1. Generate Offer & Exchange Answer"}
+                    </span>
+                  </SpecularButton>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSdpIndex((prev) => (prev + 1) % sdpOfferDecodedEntries.length)}
+                    className="px-3.5 h-9 rounded-[6px] border border-[#242424] bg-[#141414] text-xs sm:text-sm font-mono text-[#ededed] hover:border-[#404040] hover:bg-[#1a1a1a] transition-all flex items-center gap-1.5"
+                    title="Inspect next decoded SDP line"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Inspect ({selectedSdpIndex + 1}/{sdpOfferDecodedEntries.length})</span>
+                  </button>
+                </div>
+
+                {/* Action Reaction Feed */}
+                <div className="rounded-[8px] border border-[#262626] bg-[#111111] p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span className="text-xs sm:text-sm font-semibold text-[#ededed]">
+                        {lastReaction.title}
+                      </span>
+                    </div>
+                    {lastReaction.badge && (
+                      <span className="rounded bg-[#1c1c1c] px-2 py-0.5 text-xs font-mono text-purple-300 border border-[#2c2c2c]">
+                        {lastReaction.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] font-mono leading-relaxed">
+                    {lastReaction.detail}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: NEGOTIATION BRIDGE & PACKET X-RAY INSPECTOR (Col 7) */}
+            <div className="col-span-12 lg:col-span-7 h-full min-h-0 flex flex-col gap-2.5">
+              {/* TOP: THE NEGOTIATION BRIDGE & CONTRACT MATRIX */}
+              <div className="h-[40%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <ArrowLeftRight className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed]">
+                      SDP Negotiation Bridge (JSEP State Machine)
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300 flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-purple-400" />
+                    <span>{sdpOffer && sdpAnswer ? "Contract Ratified" : sdpOffer ? "Offer in Flight" : "Awaiting Offer"}</span>
+                  </span>
+                </div>
+
+                {/* Dynamic Contract Highway between Peer A & Peer B */}
+                <div className="relative my-auto flex items-center justify-between px-6 py-2">
+                  {/* Peer A Node */}
+                  <div className="flex flex-col items-center gap-1 z-10">
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-[6px] border ${
+                      sdpOffer
+                        ? "border-purple-500/40 bg-purple-950/20 text-purple-300"
+                        : "border-[#242424] bg-[#121212] text-[#777777]"
+                    }`}>
+                      <Laptop className="h-4 w-4 text-purple-400 shrink-0" />
+                      <div className="text-left font-mono">
+                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1">
+                          <span>Peer A (Offerer)</span>
+                        </div>
+                        <div className="text-[11px] text-[#888888]">{sdpOffer ? "Offer Created" : "Idle"}</div>
+                      </div>
+                      <span
+                        data-testid="peer-a-state"
+                        className="text-xs font-mono px-1.5 py-0.5 rounded bg-black/60 text-purple-300 ml-1.5 border border-purple-500/30 font-semibold"
+                      >
+                        {peerAConnectionState}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Animated Contract Exchange Beam */}
+                  <div className="relative flex-1 h-[2px] bg-[#222222] mx-4">
+                    <motion.div
+                      className="h-2.5 w-2.5 rounded-full bg-purple-400 shadow-[0_0_10px_rgba(192,132,252,1)] absolute -top-1"
+                      initial={{ left: "5%" }}
+                      animate={{ left: sdpOffer ? "95%" : "5%" }}
+                      transition={{ duration: 0.8, ease: "easeInOut" }}
+                    />
+                    {sdpAnswer && (
+                      <motion.div
+                        className="h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)] absolute -top-1"
+                        initial={{ left: "95%" }}
+                        animate={{ left: "5%" }}
+                        transition={{ duration: 0.8, delay: 0.3, ease: "easeInOut" }}
+                      />
+                    )}
+                    <div className="absolute left-1/2 -top-3.5 -translate-x-1/2 px-2 py-0.5 rounded bg-[#111111] border border-[#242424] text-[10px] font-mono text-[#888888] flex items-center gap-1">
+                      <ScrollText className="h-3 w-3 text-purple-400" />
+                      <span>{sdpAnswer ? "Offer ➔ ➔ Answer" : sdpOffer ? "Offer ➔" : "Contract Pipe"}</span>
+                    </div>
+                  </div>
+
+                  {/* Peer B Node */}
+                  <div className="flex flex-col items-center gap-1 z-10">
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-[6px] border ${
+                      sdpAnswer
+                        ? "border-cyan-500/40 bg-cyan-950/20 text-cyan-300"
+                        : "border-[#242424] bg-[#121212] text-[#777777]"
+                    }`}>
+                      <Laptop className="h-4 w-4 text-cyan-400 shrink-0" />
+                      <div className="text-left font-mono">
+                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1">
+                          <span>Peer B (Answerer)</span>
+                        </div>
+                        <div className="text-[11px] text-[#888888]">{sdpAnswer ? "Answer Accepted" : "Listening"}</div>
+                      </div>
+                      <span
+                        data-testid="peer-b-state"
+                        className="text-xs font-mono px-1.5 py-0.5 rounded bg-black/60 text-cyan-400 ml-1.5 border border-cyan-500/30 font-semibold"
+                      >
+                        {peerBConnectionState}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Agreed Treaty Parameters Matrix (4 Cards) */}
+                <div className="grid grid-cols-4 gap-2 pt-1 border-t border-[#1e1e1e]">
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Video className="h-3 w-3 text-cyan-400" />
+                      <span>Video</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">VP8 (90kHz)</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Radio className="h-3 w-3 text-emerald-400" />
+                      <span>Audio</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">Opus (48kHz)</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <MessageSquare className="h-3 w-3 text-amber-400" />
+                      <span>Data Channel</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">SCTP : 5000</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <ShieldCheck className="h-3 w-3 text-purple-400" />
+                      <span>Security</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">DTLS-SRTP</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BOTTOM: PACKET X-RAY & GATHERED CANDIDATES (SDP DEEP INSPECTOR) */}
+              <div className="h-[60%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed]">
+                      Packet X-Ray & Gathered Candidates
+                    </span>
+                  </div>
+
+                  {/* Mode Switcher Tabs */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center rounded-[6px] bg-[#141414] p-0.5 border border-[#222222]">
+                      <button
+                        type="button"
+                        onClick={() => setStep2Tab("decoded")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step2Tab === "decoded"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>Decoded Highlights</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep2Tab("diff")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step2Tab === "diff"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <GitCompare className="h-3.5 w-3.5" />
+                        <span>Offer vs Answer</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep2Tab("raw")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step2Tab === "raw"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <FileCode className="h-3.5 w-3.5" />
+                        <span>Raw SDP</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopySdp(sdpOffer || defaultSampleSdp)}
+                      className="px-2 py-1 rounded-[6px] border border-[#242424] bg-[#141414] text-xs font-mono text-[#888888] hover:text-[#ededed] hover:border-[#404040] transition-colors flex items-center gap-1"
+                      title="Copy SDP to clipboard"
+                    >
+                      {copiedSdp ? <CheckCheck className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      <span>{copiedSdp ? "Copied" : "Copy"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tab Content Display */}
+                <div className="flex-1 min-h-0 pt-2 overflow-hidden">
+                  {step2Tab === "decoded" && (
+                    <div className="h-full grid grid-cols-12 gap-2.5">
+                      {/* Left Column: List of 6 Decoded Entries */}
+                      <div className="col-span-5 h-full overflow-y-auto space-y-1.5 pr-1">
+                        {sdpOfferDecodedEntries.map((entry, idx) => (
+                          <button
+                            key={entry.prefix}
+                            type="button"
+                            onClick={() => setSelectedSdpIndex(idx)}
+                            className={`w-full text-left rounded-[6px] p-2 border transition-all flex flex-col gap-1 ${
+                              selectedSdpIndex === idx
+                                ? "border-purple-500/50 bg-purple-950/20 text-[#ededed] shadow-sm"
+                                : "border-[#202020] bg-[#0d0d0d] text-[#888888] hover:border-[#333333] hover:text-[#ededed]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                {entry.icon}
+                                <span className="font-semibold text-xs text-[#ededed]">{entry.title}</span>
+                              </div>
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/60 text-purple-300 border border-purple-500/20">
+                                {entry.badge}
+                              </span>
+                            </div>
+                            <div className="font-mono text-[11px] text-cyan-300 truncate">{entry.field}</div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Right Column: Deep Explain Card */}
+                      <div className="col-span-7 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#0c0c0c] p-3 space-y-2.5">
+                        {(() => {
+                          const active = sdpOfferDecodedEntries[selectedSdpIndex] || sdpOfferDecodedEntries[0];
+                          return (
+                            <>
+                              <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                                <div className="flex items-center gap-2">
+                                  {active.icon}
+                                  <span className="font-semibold text-sm text-[#ededed]">{active.title}</span>
+                                </div>
+                                <span className="text-xs font-mono px-2 py-0.5 rounded bg-purple-950/40 text-purple-300 border border-purple-500/30">
+                                  {active.category} • {active.badge}
+                                </span>
+                              </div>
+
+                              {/* Raw Field Box */}
+                              <div className="rounded-[6px] bg-black/80 border border-[#222222] p-2 font-mono text-xs text-purple-300 select-all">
+                                {active.field}
+                              </div>
+
+                              {/* Plain English Translation */}
+                              <div className="space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                                  <Info className="h-3.5 w-3.5 text-cyan-400" />
+                                  <span>Plain-English Translation</span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed pl-2 border-l-2 border-cyan-500/60">
+                                  {active.plainEnglish}
+                                </p>
+                              </div>
+
+                              {/* Technical Detail & RFC Note */}
+                              <div className="space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                                  <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+                                  <span>RFC Spec & Significance</span>
+                                </div>
+                                <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                                  {active.technicalDetail}
+                                </p>
+                              </div>
+
+                              {/* Peer B's Answer Counterpart */}
+                              <div className="rounded-[6px] border border-emerald-500/20 bg-emerald-950/10 p-2 space-y-1">
+                                <div className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                                  <span>Peer B's Answer Response</span>
+                                </div>
+                                <p className="text-xs text-[#a1a1a1] font-mono leading-relaxed">
+                                  {active.answerResponse}
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {step2Tab === "diff" && (
+                    <div className="h-full overflow-y-auto space-y-2">
+                      <div className="grid grid-cols-12 gap-2 text-xs font-mono font-semibold text-[#888888] pb-1 border-b border-[#222222]">
+                        <div className="col-span-3">Negotiation Parameter</div>
+                        <div className="col-span-4 text-purple-300">Peer A Offer (Proposed)</div>
+                        <div className="col-span-5 text-cyan-300">Peer B Answer (Accepted)</div>
+                      </div>
+
+                      {[
+                        {
+                          param: "Video Codecs",
+                          offer: "VP8 (96), H.264 (97)",
+                          answer: "VP8 (96) - Selected primary decoder",
+                          status: "Match (VP8)",
+                        },
+                        {
+                          param: "Audio Codecs",
+                          offer: "Opus (111), G.711 (0)",
+                          answer: "Opus (111) - 48kHz Stereo match",
+                          status: "Match (Opus)",
+                        },
+                        {
+                          param: "DataChannel Port",
+                          offer: "m=application 9 UDP/DTLS/SCTP",
+                          answer: "m=application 9 UDP/DTLS/SCTP 5000",
+                          status: "Agreed",
+                        },
+                        {
+                          param: "DTLS Role Proposal",
+                          offer: "a=setup:actpass (Either Role)",
+                          answer: "a=setup:active (Peer B acts as client)",
+                          status: "Resolved",
+                        },
+                        {
+                          param: "ICE Candidates",
+                          offer: "c=IN IP4 0.0.0.0 (Trickle ICE)",
+                          answer: "c=IN IP4 0.0.0.0 (Trickle ICE)",
+                          status: "Agreed",
+                        },
+                      ].map((row, i) => (
+                        <div
+                          key={i}
+                          className="grid grid-cols-12 gap-2 rounded-[6px] border border-[#1e1e1e] bg-[#0c0c0c] p-2 text-xs font-mono items-center"
+                        >
+                          <div className="col-span-3 text-[#ededed] font-semibold">{row.param}</div>
+                          <div className="col-span-4 text-purple-300 bg-purple-950/20 px-2 py-1 rounded border border-purple-500/20">
+                            {row.offer}
+                          </div>
+                          <div className="col-span-5 text-cyan-300 bg-cyan-950/20 px-2 py-1 rounded border border-cyan-500/20 flex items-center justify-between">
+                            <span>{row.answer}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/60 text-emerald-400 font-bold ml-1 shrink-0">
+                              {row.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {step2Tab === "raw" && (
+                    <div className="h-full flex flex-col rounded-[6px] border border-[#202020] bg-black/90 p-2 overflow-hidden">
+                      <div className="flex items-center justify-between text-xs font-mono text-[#888888] pb-1 border-b border-[#1a1a1a]">
+                        <span>Session Description Protocol Payload</span>
+                        <span>{sdpOffer ? "Live Generated Offer (42 lines)" : "Sample Offer Template"}</span>
+                      </div>
+                      <pre className="flex-1 min-h-0 overflow-y-auto pt-2 text-xs font-mono text-purple-300 leading-relaxed select-all">
+                        {sdpOffer || defaultSampleSdp}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          /* ============================================================== */
+          /* STEPS 3-6: THE ACTIVE WEBRTC EXPERIMENTATION ARENA (BENTO) */
+          /* ============================================================== */
+          <motion.div
+            key="steps-3-6-bento"
             layout
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

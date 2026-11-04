@@ -83,7 +83,45 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     fullPage: false,
   });
 
-  // 4. Beginner Lab with React Bits (Mobile)
+  // 4. Step 2 SDP Offer / Answer Bento Inspector
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator("header").getByRole("button", { name: "Next" }).click();
+  await page.waitForSelector("text=The Business Card (SDP Offer / Answer)");
+  await page.waitForTimeout(500);
+
+  // Capture Step 2 Initial
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step2-initial.png"),
+    fullPage: false,
+  });
+
+  // Trigger SDP Offer generation
+  await page.getByTestId("btn-start-offer").click();
+  await page.waitForTimeout(1000);
+
+  // Capture Step 2 Active with Decoded Highlights
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step2-active-decoded.png"),
+    fullPage: false,
+  });
+
+  // Switch to Offer vs Answer Diff
+  await page.locator("button:has-text('Offer vs Answer')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step2-active-diff.png"),
+    fullPage: false,
+  });
+
+  // Switch to Raw SDP Document
+  await page.locator("button:has-text('Raw SDP')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step2-active-raw.png"),
+    fullPage: false,
+  });
+
+  // 5. Beginner Lab with React Bits (Mobile)
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: path.join(screenshotsDir, "beginner-lab-react-bits-mobile.png"),
