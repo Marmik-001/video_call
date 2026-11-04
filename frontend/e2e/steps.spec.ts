@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Beginner Mode 6-Step Walkthrough E2E", () => {
-  test("navigates all 6 steps, interacts with live demos, and validates comprehension quizzes", async ({
+  test("navigates all 6 steps, interacts with live demos, and validates 1-viewport bento inspector", async ({
     page,
   }) => {
     await page.goto("/");
@@ -16,10 +16,6 @@ test.describe("Beginner Mode 6-Step Walkthrough E2E", () => {
     // Unpause for real-time WebRTC
     await page.getByTestId("btn-pause-toggle").click();
 
-    // Answer Step 1 quiz correctly (Option B: No, signaling server only exchanges setup notes)
-    await page.locator("text=No, the signaling server only exchanges setup notes").click();
-    await expect(page.locator("text=Correct! The signaling server only brokers initial contact.")).toBeVisible();
-
     // Navigate to Step 2
     await page.locator("header").getByRole("button", { name: "Next" }).click();
 
@@ -33,9 +29,8 @@ test.describe("Beginner Mode 6-Step Walkthrough E2E", () => {
     await expect(page.getByTestId("peer-a-state")).toHaveText("connected", { timeout: 15000 });
     await expect(page.getByTestId("peer-b-state")).toHaveText("connected", { timeout: 15000 });
 
-    // Inspect real data toggle
-    await page.locator("text=Show Real Data").click();
-    await expect(page.locator("text=Hide Real Data")).toBeVisible();
+    // Inspect Packet X-Ray Inspector in center bento card
+    await expect(page.locator("text=Packet X-Ray & Gathered Candidates")).toBeVisible();
 
     // Navigate to Step 3
     await page.locator("header").getByRole("button", { name: "Next" }).click();
@@ -44,7 +39,7 @@ test.describe("Beginner Mode 6-Step Walkthrough E2E", () => {
     // Step 3: Finding the Path (ICE Candidates)
     // -------------------------------------------------------------
     await expect(page.locator("text=Finding the Path (ICE Candidates)")).toBeVisible();
-    await expect(page.locator("text=Gathered Candidates")).toBeVisible();
+    await expect(page.locator("text=Gathered Candidates").first()).toBeVisible();
 
     // Navigate to Step 4
     await page.locator("header").getByRole("button", { name: "Next" }).click();
@@ -85,9 +80,5 @@ test.describe("Beginner Mode 6-Step Walkthrough E2E", () => {
     await page.getByTestId("input-msg-a").fill("Step 6 DataChannel Test");
     await page.getByTestId("btn-send-a").click();
     await expect(page.getByTestId("dc-log")).toContainText("Step 6 DataChannel Test", { timeout: 5000 });
-
-    // Answer Step 6 quiz
-    await page.locator("text=SCTP over DTLS").click();
-    await expect(page.locator("text=Correct! SCTP (Stream Control Transmission Protocol)")).toBeVisible();
   });
 });
