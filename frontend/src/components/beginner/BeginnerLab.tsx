@@ -20,6 +20,21 @@ import {
   Cloud,
   ArrowRight,
   Terminal,
+  Handshake,
+  Globe,
+  Target,
+  HelpCircle,
+  Lightbulb,
+  Key,
+  Send,
+  Mail,
+  ScrollText,
+  User,
+  Lock,
+  Clock,
+  Sparkles,
+  Package,
+  Info,
 } from "lucide-react";
 import { useLabStore, type CandidateInfo } from "@/store/labStore";
 import { loopbackService } from "@/services/loopback.service";
@@ -43,7 +58,7 @@ interface WsFrame {
   explanation: string;
   payload: string;
   badge?: string;
-  emoji?: string;
+  iconType?: "cloud" | "user" | "sparkles" | "zap" | "mail";
 }
 
 export const BeginnerLab: React.FC = () => {
@@ -88,9 +103,25 @@ export const BeginnerLab: React.FC = () => {
       explanation: "The central signaling server is online at wss://signaling.lab:443. It awaits WebSocket connections from peers wishing to meet in room 'mesh-402'.",
       payload: '{"status":"ready","server":"wss://signaling.lab:443","room":"mesh-402"}',
       badge: "STANDBY",
-      emoji: "☁️",
+      iconType: "cloud",
     },
   ]);
+
+  const renderFrameIcon = (iconType?: "cloud" | "user" | "sparkles" | "zap" | "mail") => {
+    switch (iconType) {
+      case "user":
+        return <User className="h-3.5 w-3.5 text-cyan-400 shrink-0" />;
+      case "sparkles":
+        return <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />;
+      case "zap":
+        return <Zap className="h-3.5 w-3.5 text-amber-400 shrink-0" />;
+      case "mail":
+        return <Mail className="h-3.5 w-3.5 text-purple-400 shrink-0" />;
+      case "cloud":
+      default:
+        return <Cloud className="h-3.5 w-3.5 text-cyan-400 shrink-0" />;
+    }
+  };
 
   // Dynamic Action Reaction State (Explains what just happened on click)
   const [lastReaction, setLastReaction] = useState<ActionReaction>({
@@ -155,7 +186,7 @@ export const BeginnerLab: React.FC = () => {
         explanation: "Peer A establishes a WebSocket connection to the matchmaker server and registers: 'I am Peer A (caller_a19). Let me know when another peer enters room mesh-402.'",
         payload: '{"action":"join_room","clientId":"caller_a19","room":"mesh-402"}',
         badge: "JOIN_ROOM",
-        emoji: "👤",
+        iconType: "user",
       },
       {
         id: `ws-${Date.now()}-2`,
@@ -165,7 +196,7 @@ export const BeginnerLab: React.FC = () => {
         explanation: "Peer B connects to the same matchmaker server: 'I am Peer B (callee_b82). I am in room mesh-402 and ready to receive connection requests.'",
         payload: '{"action":"join_room","clientId":"callee_b82","room":"mesh-402"}',
         badge: "JOIN_ROOM",
-        emoji: "👤",
+        iconType: "user",
       },
       {
         id: `ws-${Date.now()}-3`,
@@ -175,7 +206,7 @@ export const BeginnerLab: React.FC = () => {
         explanation: "The server broadcasts to both peers: 'Both parties are online in room mesh-402! Peer A, you may now generate and send your SDP offer.'",
         payload: '{"event":"room_ready","room":"mesh-402","peers":["caller_a19","callee_b82"]}',
         badge: "ROOM_READY",
-        emoji: "🎉",
+        iconType: "sparkles",
       },
     ]);
 
@@ -209,7 +240,7 @@ export const BeginnerLab: React.FC = () => {
         explanation: "Peer A sends a lightweight JSON ping through the server to test relay health. The matchmaker immediately forwards it to Peer B to prove bidirectional transport works.",
         payload: '{"type":"signal_relay","from":"caller_a19","data":{"type":"ping","note":"ready_for_sdp"}}',
         badge: "PING_RELAY",
-        emoji: "⚡",
+        iconType: "zap",
       },
     ]);
 
@@ -612,8 +643,10 @@ export const BeginnerLab: React.FC = () => {
             <div className="col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col justify-between rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 shadow-sm overflow-hidden">
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between border-b border-[#222222] pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🤝</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-cyan-500/30 bg-cyan-950/30 text-cyan-400 shrink-0">
+                      <Handshake className="h-4 w-4" />
+                    </div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <Cloud className="h-4 w-4 text-cyan-400" />
@@ -624,15 +657,16 @@ export const BeginnerLab: React.FC = () => {
                       <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Discovery & Rendezvous</span>
                     </div>
                   </div>
-                  <span className="text-xs font-mono px-2 py-0.5 rounded-[6px] border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 font-semibold">
-                    🌐 WebSocket Online
+                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 font-semibold">
+                    <Globe className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>WebSocket Online</span>
                   </span>
                 </div>
 
                 {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
                 <div className="rounded-[8px] border border-cyan-500/40 bg-gradient-to-r from-cyan-950/30 via-cyan-900/10 to-transparent p-2.5 space-y-1 shadow-sm">
                   <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-cyan-300">
-                    <span>🎯</span>
+                    <Target className="h-4 w-4 text-cyan-400" />
                     <span>Why Are We Doing This?</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
@@ -644,7 +678,7 @@ export const BeginnerLab: React.FC = () => {
                 {/* The Core Problem & Baseline */}
                 <div className="space-y-1">
                   <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
-                    <span>❓</span>
+                    <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
                     <span>The Chicken-and-Egg Dilemma</span>
                   </h3>
                   <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
@@ -654,8 +688,8 @@ export const BeginnerLab: React.FC = () => {
 
                 {/* Mental Model & Analogy */}
                 <div className="rounded-[8px] border border-[#222222] bg-[#121212] p-2.5 space-y-1 text-xs sm:text-sm">
-                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1">
-                    <span>💡</span>
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                     <span>Mental Model & Analogy</span>
                   </span>
                   <p className="text-[#ededed] italic leading-relaxed">
@@ -665,8 +699,11 @@ export const BeginnerLab: React.FC = () => {
 
                 {/* The WebRTC Rule */}
                 <div className="text-xs sm:text-sm font-mono text-[#888888] space-y-0.5 border-l-2 border-cyan-500/60 pl-2.5 py-0.5">
-                  <p>
-                    <strong className="text-[#ededed]">🔑 Key Protocol Fact:</strong> WebRTC intentionally specifies <span className="underline decoration-cyan-500 text-cyan-200">zero signaling</span>. Developers choose the transport (WebSocket, HTTP REST, SIP, or Firebase).
+                  <p className="flex items-start gap-1.5">
+                    <Key className="h-3.5 w-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-[#ededed]">Key Protocol Fact:</strong> WebRTC intentionally specifies <span className="underline decoration-cyan-500 text-cyan-200">zero signaling</span>. Developers choose the transport (WebSocket, HTTP REST, SIP, or Firebase).
+                    </span>
                   </p>
                 </div>
               </div>
@@ -674,8 +711,8 @@ export const BeginnerLab: React.FC = () => {
               {/* Numbered Action Directive ("What tells you what to do") */}
               <div className="space-y-2 pt-2 border-t border-[#1e1e1e]">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1">
-                    <span>⚡</span>
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-amber-400" />
                     <span>Interactive Directives</span>
                   </span>
                   <span className="text-xs font-mono text-cyan-400 font-medium">2-Stage Verification</span>
@@ -696,8 +733,9 @@ export const BeginnerLab: React.FC = () => {
                     onClick={handleDispatchPing}
                     className="px-3.5 h-9 rounded-[6px] border border-[#242424] bg-[#141414] text-xs sm:text-sm font-mono text-[#ededed] hover:border-[#404040] hover:bg-[#1a1a1a] transition-all flex items-center gap-1.5"
                   >
+                    <Send className="h-3.5 w-3.5 text-cyan-400" />
                     <span>2. Send Ping</span>
-                    <ArrowRight className="h-3.5 w-3.5 text-cyan-400" />
+                    <ArrowRight className="h-3 w-3 text-[#777777]" />
                   </button>
                 </div>
 
@@ -729,12 +767,12 @@ export const BeginnerLab: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Activity className="h-4 w-4 text-cyan-400" />
                     <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
-                      <span>🌐</span>
+                      <Globe className="h-4 w-4 text-cyan-400" />
                       <span>Rendezvous Highway Topology</span>
                     </span>
                   </div>
-                  <span className="text-xs font-mono text-[#888888] flex items-center gap-1">
-                    <span>☁️</span>
+                  <span className="text-xs font-mono text-[#888888] flex items-center gap-1.5">
+                    <Cloud className="h-3.5 w-3.5 text-cyan-400" />
                     <span>Cloud Broker • Room #mesh-402</span>
                   </span>
                 </div>
@@ -750,8 +788,9 @@ export const BeginnerLab: React.FC = () => {
                     }`}>
                       <Server className="h-4 w-4 text-cyan-400 shrink-0" />
                       <div className="text-left font-mono">
-                        <div className="text-xs sm:text-sm font-semibold text-[#ededed] flex items-center gap-1">
-                          <span>☁️ Signaling Server (Matchmaker)</span>
+                        <div className="text-xs sm:text-sm font-semibold text-[#ededed] flex items-center gap-1.5">
+                          <Server className="h-3.5 w-3.5 text-cyan-400" />
+                          <span>Signaling Server (Matchmaker)</span>
                         </div>
                         <div className="text-xs text-[#888888]">wss://signaling.lab:443 • Room #mesh-402</div>
                       </div>
@@ -793,8 +832,9 @@ export const BeginnerLab: React.FC = () => {
                     }`}>
                       <Laptop className="h-4 w-4 text-emerald-400 shrink-0" />
                       <div className="text-left font-mono">
-                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1">
-                          <span>💻 Peer A (Caller)</span>
+                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1.5">
+                          <Laptop className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Peer A (Caller)</span>
                         </div>
                         <div className="text-xs text-[#666666]">192.168.1.15:51200</div>
                       </div>
@@ -809,13 +849,13 @@ export const BeginnerLab: React.FC = () => {
                     {/* Rendezvous Status */}
                     <div className="text-xs font-mono text-[#888888]">
                       {signalingPingDelivered ? (
-                        <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                        <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                           <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>✅ Relay Ready</span>
+                          <span>Relay Ready</span>
                         </span>
                       ) : (
-                        <span className="text-[#888888] flex items-center gap-1">
-                          <span>⏳</span>
+                        <span className="text-[#888888] flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-amber-400/80" />
                           <span>Awaiting Ping</span>
                         </span>
                       )}
@@ -829,8 +869,9 @@ export const BeginnerLab: React.FC = () => {
                     }`}>
                       <Laptop className="h-4 w-4 text-cyan-400 shrink-0" />
                       <div className="text-left font-mono">
-                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1">
-                          <span>💻 Peer B (Callee)</span>
+                        <div className="text-xs font-semibold text-[#ededed] flex items-center gap-1.5">
+                          <Laptop className="h-3.5 w-3.5 text-cyan-400" />
+                          <span>Peer B (Callee)</span>
                         </div>
                         <div className="text-xs text-[#666666]">10.0.0.42:62400</div>
                       </div>
@@ -845,8 +886,14 @@ export const BeginnerLab: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between text-xs font-mono text-[#888888] border-t border-[#1e1e1e] pt-1">
-                  <span>📡 Signaling Channel: WebSocket Full-Duplex</span>
-                  <span>📦 Payload: JSON Text Control Frames</span>
+                  <span className="flex items-center gap-1.5">
+                    <Radio className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Signaling Channel: WebSocket Full-Duplex</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Payload: JSON Text Control Frames</span>
+                  </span>
                 </div>
               </div>
 
@@ -857,8 +904,8 @@ export const BeginnerLab: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1">
                     <div className="flex items-center gap-1.5">
                       <Terminal className="h-4 w-4 text-emerald-400" />
-                      <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1">
-                        <span>📜</span>
+                      <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
+                        <ScrollText className="h-4 w-4 text-emerald-400" />
                         <span>Live WebSocket Stream</span>
                       </span>
                     </div>
@@ -872,7 +919,7 @@ export const BeginnerLab: React.FC = () => {
                       <div key={frame.id} className="rounded-[6px] border border-[#222222] bg-[#0c0c0c] p-2 space-y-1.5 text-xs">
                         <div className="flex items-center justify-between gap-1 flex-wrap">
                           <div className="flex items-center gap-1.5 font-mono">
-                            <span className="text-sm">{frame.emoji || "✉️"}</span>
+                            {renderFrameIcon(frame.iconType)}
                             <span className={`px-2 py-0.5 rounded-[4px] text-xs font-bold border ${
                               frame.direction === "A ➔ SRV"
                                 ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/40"
@@ -900,8 +947,8 @@ export const BeginnerLab: React.FC = () => {
                     ))}
                   </div>
 
-                  <div className="text-xs font-mono text-[#888888] pt-1.5 border-t border-[#1a1a1a] flex items-center gap-1">
-                    <span>ℹ️</span>
+                  <div className="text-xs font-mono text-[#888888] pt-1.5 border-t border-[#1a1a1a] flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
                     <span>Server only forwards signaling metadata; media never flows here.</span>
                   </div>
                 </div>
@@ -911,13 +958,13 @@ export const BeginnerLab: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
                     <div className="flex items-center gap-1.5">
                       <MessageSquare className="h-4 w-4 text-cyan-400" />
-                      <span className="text-xs sm:text-sm font-semibold text-[#ededed] flex items-center gap-1">
-                        <span>💬</span>
+                      <span className="text-xs sm:text-sm font-semibold text-[#ededed] flex items-center gap-1.5">
+                        <MessageSquare className="h-3.5 w-3.5 text-cyan-400" />
                         <span>P2P Data Channel</span>
                       </span>
                     </div>
-                    <span className="text-xs font-mono text-emerald-400 font-semibold flex items-center gap-1">
-                      <span>⚡</span>
+                    <span className="text-xs font-mono text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <Zap className="h-3.5 w-3.5 text-emerald-400" />
                       <span>Direct Pipe</span>
                     </span>
                   </div>
@@ -928,7 +975,7 @@ export const BeginnerLab: React.FC = () => {
                   >
                     {dataChannelMessages.length === 0 ? (
                       <div className="text-[#666666] italic flex items-center gap-1.5 py-4 justify-center text-xs">
-                        <span>🔒</span>
+                        <Lock className="h-3.5 w-3.5 text-[#666666]" />
                         <span>Direct wire activates once connected</span>
                       </div>
                     ) : (
@@ -946,7 +993,7 @@ export const BeginnerLab: React.FC = () => {
                     <div className="flex gap-1.5">
                       <input
                         type="text"
-                        placeholder="✉️ Send from A..."
+                        placeholder="Send from A..."
                         value={messageInputA}
                         onChange={(e) => setMessageInputA(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSendA()}
@@ -966,7 +1013,7 @@ export const BeginnerLab: React.FC = () => {
                     <div className="flex gap-1.5">
                       <input
                         type="text"
-                        placeholder="✉️ Send from B..."
+                        placeholder="Send from B..."
                         value={messageInputB}
                         onChange={(e) => setMessageInputB(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSendB()}
