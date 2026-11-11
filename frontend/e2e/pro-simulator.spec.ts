@@ -87,4 +87,28 @@ test.describe("WebRTC Pro Mode: Network Chaos & ICE Simulator", () => {
     await page.locator('[data-testid="btn-launch-pro"]').click();
     await expect(page.getByText("WebRTC Pro Simulator")).toBeVisible();
   });
+
+  test("switches to Live WebRTC Wire mode, connects real dual peers, and displays live video & stats", async ({
+    page,
+  }) => {
+    // Switch to Live Wire mode
+    await page.locator('[data-testid="mode-btn-live"]').click();
+    await expect(page.getByText("Dual Concurrent Peers • Real WebRTC Loopback")).toBeVisible();
+
+    // Verify video viewports exist
+    await expect(page.locator('[data-testid="live-video-a"]')).toBeVisible();
+    await expect(page.locator('[data-testid="live-video-b"]')).toBeVisible();
+
+    // Connect Dual Peers in browser
+    await page.locator('[data-testid="btn-toggle-live-wire"]').click();
+    await expect(page.getByText(/Live: HOST|Live: SRFLX|Live: Negotiating/)).toBeVisible();
+
+    // Toggle fireboard tab
+    await page.locator('[data-testid="pro-tab-matrix"]').click();
+    await expect(page.getByText("Candidate Fireboard")).toBeVisible();
+
+    // Hang up
+    await page.locator('[data-testid="btn-toggle-live-wire"]').click();
+    await expect(page.locator('[data-testid="metric-route-type"]')).toHaveText("Live Wire Standby");
+  });
 });
