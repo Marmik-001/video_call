@@ -100,6 +100,9 @@ export const BeginnerLab: React.FC = () => {
   const [messageInputA, setMessageInputA] = useState("");
   const [messageInputB, setMessageInputB] = useState("");
 
+  // Perspective Switcher State: "A" (Caller) vs "B" (Callee)
+  const [perspective, setPerspective] = useState<"A" | "B">("A");
+
   // CallChip Live Action Timer State
   const [callChipLabel, setCallChipLabel] = useState("ready_for_handshake");
   const [callChipState, setCallChipState] = useState<CallChipState>("idle");
@@ -850,6 +853,71 @@ a=setup:actpass`;
     }, 900);
   };
 
+  // Step 1: Dispatch Test Rendezvous Pong (Callee Perspective)
+  const handleDispatchPongB = () => {
+    if (!signalingConnected) {
+      handleConnectSignaling();
+    }
+    setSignalingPingActive(true);
+    setCallChipLabel("dispatching_callee_pong");
+    setCallChipState("running");
+
+    const now = new Date().toLocaleTimeString();
+    setWsFrames((prev) => [
+      ...prev,
+      {
+        id: `ws-${Date.now()}-pong`,
+        timestamp: now,
+        direction: "B ➔ SRV",
+        title: "Callee Heartbeat Pong (B ➔ Server ➔ A)",
+        explanation: "Peer B transmits a JSON pong frame to signaling relay verifying that Callee client is active and listening for room notifications.",
+        payload: '{"type":"signal_relay","from":"callee_b42","to":"caller_a19","data":{"type":"pong","status":"ready_to_answer"}}',
+        badge: "PONG_ACK",
+        iconType: "zap",
+      },
+    ]);
+
+    setTimeout(() => {
+      setSignalingPingActive(false);
+      setSignalingPingDelivered(true);
+      setCallChipLabel("callee_pong_acknowledged");
+      setCallChipState("success");
+      setCallChipDuration(600);
+
+      setLastReaction({
+        title: "Callee Pong Acknowledged (B ➔ Server ➔ A)",
+        detail: "Peer B dispatched acknowledgment pong frame through the server. The signaling highway is confirmed bidirectional and ready for SDP Offer / Answer exchange.",
+        badge: "PONG VERIFIED",
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    }, 800);
+  };
+
+  // Step 2 Callee action: Accept offer & generate answer
+  const handleAcceptOfferB = async () => {
+    if (!sdpOffer) {
+      await handleStartHandshake();
+    }
+    setCallChipLabel("generating_sdp_answer");
+    setCallChipState("running");
+
+    setLastReaction({
+      title: "Peer B Accepted Offer & Signed SDP Answer",
+      detail: "Callee invoked setRemoteDescription(offer), negotiated mutually supported codecs (VP8 + Opus), and dispatched SDP Answer to Peer A.",
+      badge: "ANSWER SIGNED",
+      timestamp: new Date().toLocaleTimeString(),
+    });
+
+    setTimeout(async () => {
+      if (useLabStore.getState().mailbox.length > 0) {
+        await loopbackService.stepNext();
+      }
+      setCallChipLabel("sdp_answer_dispatched");
+      setCallChipState("success");
+      setCallChipDuration(800);
+    }, 600);
+  };
+
   // Handle Offer Creation with CallChip feedback and dynamic reaction
   const handleStartHandshake = async () => {
     setCallChipLabel("generating_sdp_offer_and_datachannel");
@@ -982,6 +1050,35 @@ a=setup:actpass`;
     }, 900);
   };
 
+  // Step 4 Callee NAT simulation
+  const handleTriggerNatSimulationB = () => {
+    setNatPacketInFlight(true);
+    setCallChipLabel("callee_nat_rewriting_header");
+    setCallChipState("running");
+
+    setLastReaction({
+      title: "Peer B Outbound Packet to STUN Server",
+      detail: "Source packet originating from Peer B private address 10.0.0.42:58210 hitting NAT router...",
+      badge: "CALLEE NAT",
+      timestamp: new Date().toLocaleTimeString(),
+    });
+
+    setTimeout(() => {
+      setNatPinholeActive(true);
+      setNatPacketInFlight(false);
+      setCallChipLabel("callee_pinhole_active_198.51.100.88:51240");
+      setCallChipState("success");
+      setCallChipDuration(1100);
+
+      setLastReaction({
+        title: "Peer B NAT Pinhole Active (STUN Reflected)",
+        detail: "Router allocated external pinhole 198.51.100.88:51240 for Peer B. Inbound packets from Peer A can now reach Peer B's private subnet socket.",
+        badge: "PINHOLE OPEN",
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    }, 900);
+  };
+
   // Step 5 Media capture trigger
   const handleRequestMedia = async () => {
     setMediaStatus("requesting");
@@ -1055,6 +1152,52 @@ a=setup:actpass`;
               state={callChipState}
               durationMs={callChipDuration}
             />
+          </div>
+
+          {/* Perspective Switcher Toggle */}
+          <div className="flex items-center rounded-[6px] bg-[#101010] p-0.5 border border-[#222222]" data-testid="perspective-toggle">
+            <button
+              type="button"
+              onClick={() => {
+                setPerspective("A");
+                setLastReaction({
+                  title: "Perspective: Peer A (Caller)",
+                  detail: "Switched to Caller (Offerer) viewpoint. You initiate signaling, create the SDP Offer, and gather local candidates.",
+                  badge: "CALLER VIEW",
+                  timestamp: new Date().toLocaleTimeString(),
+                });
+              }}
+              data-testid="perspective-btn-a"
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-xs font-mono transition-all ${
+                perspective === "A"
+                  ? "bg-purple-950/40 text-purple-300 border border-purple-500/40 font-semibold shadow-sm"
+                  : "text-[#777777] hover:text-[#ededed]"
+              }`}
+            >
+              <Laptop className="h-3 w-3 text-purple-400" />
+              <span>Peer A (Caller)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPerspective("B");
+                setLastReaction({
+                  title: "Perspective: Peer B (Callee)",
+                  detail: "Switched to Callee (Answerer) viewpoint. You wait for room notifications, process incoming offers, and sign the SDP Answer.",
+                  badge: "CALLEE VIEW",
+                  timestamp: new Date().toLocaleTimeString(),
+                });
+              }}
+              data-testid="perspective-btn-b"
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-xs font-mono transition-all ${
+                perspective === "B"
+                  ? "bg-cyan-950/40 text-cyan-300 border border-cyan-500/40 font-semibold shadow-sm"
+                  : "text-[#777777] hover:text-[#ededed]"
+              }`}
+            >
+              <Server className="h-3 w-3 text-cyan-400" />
+              <span>Peer B (Callee)</span>
+            </button>
           </div>
         </div>
 
@@ -1147,16 +1290,25 @@ a=setup:actpass`;
                       <div className="flex items-center gap-1.5">
                         <Cloud className="h-4 w-4 text-purple-400" />
                         <span className="text-sm sm:text-base font-bold text-[#ededed]">
-                          Step 1 • The Matchmaker (Signaling)
+                          {perspective === "A"
+                            ? "Step 1 • The Matchmaker (Signaling)"
+                            : "Step 1 • The Waiting Receiver (Callee Signaling)"}
                         </span>
                       </div>
-                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Discovery & Rendezvous</span>
+                      <span className="text-xs font-mono text-[#888888]">
+                        Curriculum • {perspective === "A" ? "Caller View (Initiator)" : "Callee View (Receiver)"}
+                      </span>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
-                    <Globe className="h-3.5 w-3.5 text-purple-400" />
-                    <span>WebSocket Online</span>
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      {perspective === "A" ? "Peer A" : "Peer B"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                      <Globe className="h-3.5 w-3.5 text-purple-400" />
+                      <span>WebSocket Online</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
@@ -1166,8 +1318,9 @@ a=setup:actpass`;
                     <span>Why Are We Doing This?</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
-                    Before two browsers can talk directly, neither knows the other's IP address or private home router port.
-                    We use this temporary server as a "matchmaker" just long enough to swap contact cards — once connected, real video and audio never touch this server!
+                    {perspective === "A"
+                      ? "Before two browsers can talk directly, neither knows the other's IP address or private home router port. We use this temporary server as a 'matchmaker' just long enough to swap contact cards — once connected, real video and audio never touch this server!"
+                      : "As Callee (Peer B), you cannot accept incoming P2P connections blindly because you don't know who is calling. You maintain a persistent WebSocket channel to the signaling server waiting for incoming notifications from room 'mesh-402'."}
                   </p>
                 </div>
 
@@ -1175,10 +1328,12 @@ a=setup:actpass`;
                 <div className="space-y-1">
                   <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
                     <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
-                    <span>The Chicken-and-Egg Dilemma</span>
+                    <span>{perspective === "A" ? "The Chicken-and-Egg Dilemma" : "The Callee Rendezvous Problem"}</span>
                   </h3>
                   <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
-                    WebRTC creates direct, encrypted peer-to-peer pipelines for video and data. But <strong className="text-[#ededed]">two browsers cannot dial each other blindly</strong>. They live behind private home routers (NAT) and neither browser knows the other's public IP or supported codecs.
+                    {perspective === "A"
+                      ? "WebRTC creates direct, encrypted peer-to-peer pipelines for video and data. But two browsers cannot dial each other blindly. They live behind private home routers (NAT) and neither browser knows the other's public IP or supported codecs."
+                      : "Peer B is waiting for an incoming call. Because NAT blocks unsolicited inbound traffic, Peer B must keep an open outbound WebSocket connection to the matchmaker server so the server can push incoming offers directly to Peer B."}
                   </p>
                 </div>
 
@@ -1189,7 +1344,9 @@ a=setup:actpass`;
                     <span>Mental Model & Analogy</span>
                   </span>
                   <p className="text-[#ededed] italic leading-relaxed">
-                    "You want to make a private phone call with someone across the world, but you first need a mutual friend to introduce you and exchange your phone numbers."
+                    {perspective === "A"
+                      ? '"You want to make a private phone call with someone across the world, but you first need a mutual friend to introduce you and exchange your phone numbers."'
+                      : '"Peer B is sitting by the telephone. Peer A dials into the central exchange, and the operator dispatches a ring notification to Peer B\'s terminal."'}
                   </p>
                 </div>
 
@@ -1221,16 +1378,20 @@ a=setup:actpass`;
                     className={`flex-1 h-9 text-xs sm:text-sm font-semibold ${signalingConnected ? "opacity-90" : ""}`}
                   >
                     <Zap className="h-3.5 w-3.5 mr-1 text-amber-400" />
-                    <span>{signalingConnected ? "1. Connected & Offer Initialized" : "1. Connect Peers to Server"}</span>
+                    <span>
+                      {perspective === "A"
+                        ? (signalingConnected ? "1. Connected & Offer Initialized" : "1. Connect Peers to Server")
+                        : (signalingConnected ? "1. Callee Socket Registered" : "1. Connect Peer B to Server")}
+                    </span>
                   </SpecularButton>
 
                   <button
                     type="button"
-                    onClick={handleDispatchPing}
+                    onClick={perspective === "A" ? handleDispatchPing : handleDispatchPongB}
                     className="px-3.5 h-9 rounded-[6px] border border-[#242424] bg-[#141414] text-xs sm:text-sm font-mono text-[#ededed] hover:border-[#404040] hover:bg-[#1a1a1a] transition-all flex items-center gap-1.5"
                   >
                     <Send className="h-3.5 w-3.5 text-cyan-400" />
-                    <span>2. Send Ping</span>
+                    <span>{perspective === "A" ? "2. Send Ping" : "2. Send Pong ACK"}</span>
                     <ArrowRight className="h-3 w-3 text-[#777777]" />
                   </button>
                 </div>
@@ -1555,16 +1716,25 @@ a=setup:actpass`;
                       <div className="flex items-center gap-1.5">
                         <ScrollText className="h-4 w-4 text-purple-400" />
                         <span className="text-sm sm:text-base font-bold text-[#ededed]">
-                          Step 2 • The Business Card (SDP Offer / Answer)
+                          {perspective === "A"
+                            ? "Step 2 • The Business Card (SDP Offer / Answer)"
+                            : "Step 2 • The Counter-Offer (Callee SDP Answer)"}
                         </span>
                       </div>
-                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Capability Negotiation & Media Contract</span>
+                      <span className="text-xs font-mono text-[#888888]">
+                        Curriculum • {perspective === "A" ? "Caller View (Offerer)" : "Callee View (Answerer)"}
+                      </span>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold">
-                    <BookOpen className="h-3.5 w-3.5 text-purple-400" />
-                    <span>RFC 8829 • JSEP</span>
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      {perspective === "A" ? "Peer A" : "Peer B"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold">
+                      <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+                      <span>RFC 8829 • JSEP</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
@@ -1574,8 +1744,9 @@ a=setup:actpass`;
                     <span>Why Are We Doing This?</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
-                    Before sending encrypted video or data, both browsers must legally agree on codecs, crypto fingerprints, and media streams.
-                    They write this down in an SDP text contract — the Caller sends an <strong className="text-purple-300">Offer</strong>, and the Callee replies with an <strong className="text-cyan-300">Answer</strong>!
+                    {perspective === "A"
+                      ? "Before sending encrypted video or data, both browsers must legally agree on codecs, crypto fingerprints, and media streams. They write this down in an SDP text contract — the Caller sends an Offer, and the Callee replies with an Answer!"
+                      : "As Callee (Peer B), you receive Peer A's offer, invoke setRemoteDescription(offer), inspect proposed codecs, select the common match (VP8 + Opus), and return an SDP Answer signed with setLocalDescription(answer)!"}
                   </p>
                 </div>
 
@@ -1583,10 +1754,12 @@ a=setup:actpass`;
                 <div className="space-y-1">
                   <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
                     <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
-                    <span>The Codec Compatibility Dilemma</span>
+                    <span>{perspective === "A" ? "The Codec Compatibility Dilemma" : "The Callee Verification Process"}</span>
                   </h3>
                   <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
-                    Browser A might support VP8 and AV1, while Browser B only supports H.264. If A transmits VP8 without checking, B crashes or renders black frames. <strong className="text-[#ededed]">SDP negotiation ensures both peers agree on their highest mutual capability</strong> before transmitting media.
+                    {perspective === "A"
+                      ? "Browser A might support VP8 and AV1, while Browser B only supports H.264. If A transmits VP8 without checking, B crashes or renders black frames. SDP negotiation ensures both peers agree on their highest mutual capability before transmitting media."
+                      : "When Peer B receives the SDP offer, it checks what video and audio codecs Peer A can send. Peer B selects mutually supported codecs, generates its own answer with createAnswer(), and commits it locally with setLocalDescription(answer)."}
                   </p>
                 </div>
 
@@ -1597,7 +1770,9 @@ a=setup:actpass`;
                     <span>Mental Model & Analogy</span>
                   </span>
                   <p className="text-[#ededed] italic leading-relaxed">
-                    "Before starting an international business deal, two executives swap contracts: 'I speak English and French, I use 256-bit encryption, and I listen on port 5000. Do you accept?'"
+                    {perspective === "A"
+                      ? '"Before starting an international business deal, two executives swap contracts: \'I speak English and French, I use 256-bit encryption, and I listen on port 5000. Do you accept?\'"'
+                      : '"Peer B receives Peer A\'s proposed contract, verifies the terms, signs the agreement: \'Accepted! We will use VP8 video and Opus audio on port 49152.\' and returns the executed copy."'}
                   </p>
                 </div>
 
@@ -1624,17 +1799,23 @@ a=setup:actpass`;
 
                 <div className="flex gap-2">
                   <SpecularButton
-                    onClick={handleStartHandshake}
+                    onClick={perspective === "A" ? handleStartHandshake : handleAcceptOfferB}
                     data-testid="btn-start-offer"
                     className="flex-1 h-9 text-xs sm:text-sm font-semibold"
                   >
                     <FileText className="h-3.5 w-3.5 mr-1 text-purple-400" />
                     <span>
-                      {sdpOffer && sdpAnswer
-                        ? "Negotiation Complete (VP8 + Opus)"
-                        : sdpOffer
-                        ? "Offer Sent • Awaiting Answer"
-                        : "1. Generate Offer & Exchange Answer"}
+                      {perspective === "A"
+                        ? (sdpOffer && sdpAnswer
+                            ? "Negotiation Complete (VP8 + Opus)"
+                            : sdpOffer
+                            ? "Offer Sent • Awaiting Answer"
+                            : "1. Generate Offer & Exchange Answer")
+                        : (sdpAnswer
+                            ? "Negotiation Complete (VP8 + Opus Accepted)"
+                            : sdpOffer
+                            ? "2. Accept Offer & Sign SDP Answer"
+                            : "1. Awaiting Offer from Peer A (Click to start)")}
                     </span>
                   </SpecularButton>
 
@@ -2048,16 +2229,25 @@ a=setup:actpass`;
                       <div className="flex items-center gap-1.5">
                         <Radio className="h-4 w-4 text-purple-400" />
                         <span className="text-sm sm:text-base font-bold text-[#ededed]">
-                          Step 3 • Finding the Path (ICE Candidates)
+                          {perspective === "A"
+                            ? "Step 3 • Finding the Path (ICE Candidates)"
+                            : "Step 3 • Callee Candidate Trickling (Peer B Routes)"}
                         </span>
                       </div>
-                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: Network Path Hunting & Hole Punching</span>
+                      <span className="text-xs font-mono text-[#888888]">
+                        Curriculum • {perspective === "A" ? "Caller Path Hunting" : "Callee Path Hunting"}
+                      </span>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
-                    <Zap className="h-3.5 w-3.5 text-purple-400" />
-                    <span>RFC 8445 • ICE</span>
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      {perspective === "A" ? "Peer A" : "Peer B"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                      <Zap className="h-3.5 w-3.5 text-purple-400" />
+                      <span>RFC 8445 • ICE</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
@@ -2067,8 +2257,9 @@ a=setup:actpass`;
                     <span>Why Are We Doing This?</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
-                    Video codecs are agreed, but neither browser knows what physical wire connects them.
-                    ICE gathers every possible IP address and port (host LAN, STUN NAT pinholes, and TURN cloud relays) so the browsers can punch through firewalls and find the fastest route!
+                    {perspective === "A"
+                      ? "Video codecs are agreed, but neither browser knows what physical wire connects them. ICE gathers every possible IP address and port (host LAN, STUN NAT pinholes, and TURN cloud relays) so the browsers can punch through firewalls and find the fastest route!"
+                      : "As Callee (Peer B), the moment setLocalDescription(answer) is executed, your browser gathers its own candidate endpoints: local interface (10.0.0.42), STUN reflexive (198.51.100.88), and TURN relays. You trickle these to Peer A so Peer A's ICE agent can pair and test them!"}
                   </p>
                 </div>
 
@@ -2076,10 +2267,12 @@ a=setup:actpass`;
                 <div className="space-y-1">
                   <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
                     <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
-                    <span>The NAT & Firewall Blackout</span>
+                    <span>{perspective === "A" ? "The NAT & Firewall Blackout" : "The Callee Path Announcement"}</span>
                   </h3>
                   <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
-                    Your laptop's local Wi-Fi IP (<code className="text-emerald-300">192.168.1.15</code>) is completely invisible to the outside world. Home routers use NAT to disguise internal devices. <strong className="text-[#ededed]">ICE collects candidate network coordinates</strong> across LAN, STUN, and TURN so peers can find a working path.
+                    {perspective === "A"
+                      ? "Your laptop's local Wi-Fi IP (192.168.1.15) is completely invisible to the outside world. Home routers use NAT to disguise internal devices. ICE collects candidate network coordinates across LAN, STUN, and TURN so peers can find a working path."
+                      : "Peer B's private subnet address (10.0.0.42) is unreachable from Peer A's home network. Peer B queries STUN to discover its public reflection (198.51.100.88:51240) and transmits candidate lines to Peer A over signaling."}
                   </p>
                 </div>
 
@@ -2090,7 +2283,9 @@ a=setup:actpass`;
                     <span>Mental Model & Analogy</span>
                   </span>
                   <p className="text-[#ededed] italic leading-relaxed">
-                    "You want a friend in another city to visit your apartment. You give them: 1. Your Wi-Fi LAN address (if they are in the same room), 2. Your building's street address & buzz code (STUN), and 3. A trusted 24/7 postal concierge locker (TURN) if the front gate is locked."
+                    {perspective === "A"
+                      ? '"You want a friend in another city to visit your apartment. You give them: 1. Your Wi-Fi LAN address (if they are in the same room), 2. Your building\'s street address & buzz code (STUN), and 3. A trusted 24/7 postal concierge locker (TURN) if the front gate is locked."'
+                      : '"Peer B writes down its own return address coordinates: \'Here is my office LAN IP, my building\'s STUN buzzer, and my TURN postal locker for when you send packets.\'"'}
                   </p>
                 </div>
 
@@ -2124,8 +2319,12 @@ a=setup:actpass`;
                     <Network className="h-3.5 w-3.5 mr-1 text-purple-400" />
                     <span>
                       {gatheredCandidates.length > 0
-                        ? `Candidates Gathered (${gatheredCandidates.length} Active)`
-                        : "1. Gather All Candidate Routes"}
+                        ? (perspective === "A"
+                            ? `Candidates Gathered (${gatheredCandidates.length} Active)`
+                            : `Callee Candidates Trickled (${gatheredCandidates.length} Active)`)
+                        : (perspective === "A"
+                            ? "1. Gather All Candidate Routes"
+                            : "1. Gather & Trickle Callee Routes")}
                     </span>
                   </SpecularButton>
 
@@ -2556,16 +2755,25 @@ a=setup:actpass`;
                       <div className="flex items-center gap-1.5">
                         <Radio className="h-4 w-4 text-purple-400" />
                         <span className="text-sm sm:text-base font-bold text-[#ededed]">
-                          Step 4 • The Apartment Front Desk (NAT Basics)
+                          {perspective === "A"
+                            ? "Step 4 • The Apartment Front Desk (NAT Basics)"
+                            : "Step 4 • The Remote Office Router (Peer B NAT)"}
                         </span>
                       </div>
-                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: NAT Translation & Pinhole Punching</span>
+                      <span className="text-xs font-mono text-[#888888]">
+                        Curriculum • {perspective === "A" ? "Caller NAT Traversal" : "Callee NAT Traversal"}
+                      </span>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
-                    <Zap className="h-3.5 w-3.5 text-purple-400" />
-                    <span>RFC 3022 • NAT</span>
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      {perspective === "A" ? "Peer A" : "Peer B"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                      <Zap className="h-3.5 w-3.5 text-purple-400" />
+                      <span>RFC 3022 • NAT</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
@@ -2575,8 +2783,9 @@ a=setup:actpass`;
                     <span>Why Are We Doing This?</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
-                    Millions of homes share private IPs like <code>192.168.x.x</code> that are impossible to reach from outside.
-                    Your home router rewrites packet headers through NAT and punches a temporary return <strong>pinhole</strong> so peers can stream video back!
+                    {perspective === "A"
+                      ? "Millions of homes share private IPs like 192.168.x.x that are impossible to reach from outside. Your home router rewrites packet headers through NAT and punches a temporary return pinhole so peers can stream video back!"
+                      : "Peer B is situated behind its own NAT router (10.0.0.42). When Peer B sends an outbound STUN request, its router allocates an external pinhole (198.51.100.88:51240) so Peer A's inbound media packets can enter!"}
                   </p>
                 </div>
 
@@ -2584,10 +2793,12 @@ a=setup:actpass`;
                 <div className="space-y-1">
                   <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
                     <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
-                    <span>The One-Way Mirror Firewall Dilemma</span>
+                    <span>{perspective === "A" ? "The One-Way Mirror Firewall Dilemma" : "The Callee Return Ingress Barrier"}</span>
                   </h3>
                   <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
-                    By default, your home firewall silently drops unsolicited incoming packets from strangers. To receive video from Peer B, <strong className="text-[#ededed]">Peer A must first send an outbound packet through the router</strong>, which registers a 30-second stateful pinhole allowing Peer B's reply.
+                    {perspective === "A"
+                      ? "By default, your home firewall silently drops unsolicited incoming packets from strangers. To receive video from Peer B, Peer A must first send an outbound packet through the router, which registers a 30-second stateful pinhole allowing Peer B's reply."
+                      : "Peer B's router also drops unsolicited packets from strangers. Peer B must punch a stateful pinhole by sending an outbound binding request to STUN, establishing the symmetric return channel for Peer A's video packets."}
                   </p>
                 </div>
 
@@ -2598,7 +2809,9 @@ a=setup:actpass`;
                     <span>Mental Model & Analogy</span>
                   </span>
                   <p className="text-[#ededed] italic leading-relaxed">
-                    "Your apartment building has one street address, but individual apartment numbers are secret from outside delivery drivers until the front desk logs your outgoing request."
+                    {perspective === "A"
+                      ? '"Your apartment building has one street address, but individual apartment numbers are secret from outside delivery drivers until the front desk logs your outgoing request."'
+                      : '"Peer B works in an office building with a private reception desk. When Peer B buzzes the delivery courier outside, the security gate logs the badge and permits the courier inside."'}
                   </p>
                 </div>
 
@@ -2625,11 +2838,11 @@ a=setup:actpass`;
 
                 <div className="flex gap-2">
                   <SpecularButton
-                    onClick={handleTriggerNatSimulation}
+                    onClick={perspective === "A" ? handleTriggerNatSimulation : handleTriggerNatSimulationB}
                     className="flex-1 h-9 text-xs sm:text-sm font-semibold"
                   >
                     <Radio className="h-3.5 w-3.5 mr-1 text-purple-400" />
-                    <span>Send Outbound Packet through NAT</span>
+                    <span>{perspective === "A" ? "Send Outbound Packet through NAT" : "Send Outbound Packet through Peer B NAT"}</span>
                   </SpecularButton>
 
                   <button
@@ -2694,13 +2907,17 @@ a=setup:actpass`;
 
                 {/* Visual 3-Node Packet Transformation Highway */}
                 <div className="relative my-auto flex items-center justify-between px-3 py-1">
-                  {/* Node 1: Private LAN (Peer A) */}
+                  {/* Node 1: Private LAN (Peer A / Peer B) */}
                   <div className="flex flex-col items-center gap-1 z-10 w-36">
                     <div className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] border border-emerald-500/40 bg-emerald-950/20 text-emerald-300">
                       <Laptop className="h-4 w-4 text-emerald-400 shrink-0" />
                       <div className="text-left font-mono truncate">
-                        <div className="text-[11px] font-semibold text-[#ededed]">Private LAN</div>
-                        <div className="text-[10px] text-[#888888] truncate">192.168.1.15:54321</div>
+                        <div className="text-[11px] font-semibold text-[#ededed]">
+                          {perspective === "A" ? "Private LAN (A)" : "Private Subnet (B)"}
+                        </div>
+                        <div className="text-[10px] text-[#888888] truncate">
+                          {perspective === "A" ? "192.168.1.15:54321" : "10.0.0.42:58210"}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2716,7 +2933,7 @@ a=setup:actpass`;
                       />
                     )}
                     <div className="absolute left-1/2 -top-3 -translate-x-1/2 px-1.5 py-0.2 rounded bg-[#111111] text-[9px] font-mono text-[#777777] border border-[#202020] whitespace-nowrap">
-                      Src: 192.168.1.15:54321
+                      {perspective === "A" ? "Src: 192.168.1.15:54321" : "Src: 10.0.0.42:58210"}
                     </div>
                   </div>
 
@@ -2730,9 +2947,11 @@ a=setup:actpass`;
                       <Server className="h-4 w-4 text-purple-400 shrink-0" />
                       <div className="text-left font-mono">
                         <div className="text-[11px] font-semibold text-[#ededed] flex items-center gap-1">
-                          <span>NAT Gateway</span>
+                          <span>{perspective === "A" ? "NAT Gateway (A)" : "NAT Gateway (B)"}</span>
                         </div>
-                        <div className="text-[10px] text-[#888888]">103.21.44.12:49152</div>
+                        <div className="text-[10px] text-[#888888]">
+                          {perspective === "A" ? "103.21.44.12:49152" : "198.51.100.88:51240"}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2748,7 +2967,7 @@ a=setup:actpass`;
                       />
                     )}
                     <div className="absolute left-1/2 -top-3 -translate-x-1/2 px-1.5 py-0.2 rounded bg-[#111111] text-[9px] font-mono text-purple-300 border border-purple-500/30 whitespace-nowrap">
-                      Rewritten: 103.21.44.12:49152
+                      {perspective === "A" ? "Rewritten: 103.21.44.12:49152" : "Rewritten: 198.51.100.88:51240"}
                     </div>
                   </div>
 
@@ -3068,10 +3287,14 @@ a=setup:actpass`;
 
                 <div>
                   <h2 className="text-base sm:text-lg font-semibold tracking-tight text-[#ededed]">
-                    Hooking up the Cameras (Media Streams & Tracks)
+                    {perspective === "A"
+                      ? "Hooking up the Cameras (Media Streams & Tracks)"
+                      : "Receiving & Rendering Media (Callee Video)"}
                   </h2>
                   <p className="text-xs text-[#888888]">
-                    Acquiring hardware camera & mic buffers, negotiating codecs, and streaming RTP tracks.
+                    {perspective === "A"
+                      ? "Acquiring hardware camera & mic buffers, negotiating codecs, and streaming RTP tracks."
+                      : "Receiving incoming RTP video tracks, processing jitter buffers, and decoding VP8 frames."}
                   </p>
                 </div>
 
@@ -3082,7 +3305,9 @@ a=setup:actpass`;
                     <span>Why Are We Doing This?</span>
                   </div>
                   <p className="text-xs text-purple-200/90 leading-relaxed font-mono">
-                    Before peers can stream live video, the browser must capture hardware devices via <code className="text-purple-300 font-bold">getUserMedia()</code>, package raw buffers into discrete <code className="text-purple-300 font-bold">MediaStreamTracks</code>, and bind them to the RTCPeerConnection for hardware-accelerated encoding.
+                    {perspective === "A"
+                      ? "Before peers can stream live video, the browser must capture hardware devices via getUserMedia(), package raw buffers into discrete MediaStreamTracks, and bind them to the RTCPeerConnection for hardware-accelerated encoding."
+                      : "As Callee (Peer B), the incoming media track from Peer A arrives through the peerConnection.ontrack event! Peer B initializes a jitter buffer to reassemble out-of-order UDP packets, decrypts the SRTP stream using DTLS keys, and renders the feed into an HTML5 <video> element."}
                   </p>
                 </div>
 
@@ -3227,7 +3452,7 @@ a=setup:actpass`;
                   <div className="flex items-center gap-2">
                     <Video className="h-4 w-4 text-purple-400" />
                     <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed]">
-                      Media Studio & Stream Monitor
+                      {perspective === "A" ? "Media Studio & Stream Monitor (Caller)" : "Media Studio & Receiver Monitor (Callee)"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -3241,19 +3466,19 @@ a=setup:actpass`;
                       {mediaStatus !== "idle" ? "Hardware Online" : "Stream Standby"}
                     </span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
-                      [STUDIO PREVIEW]
+                      {perspective === "A" ? "[CALLER PREVIEW]" : "[CALLEE RECEIVER]"}
                     </span>
                   </div>
                 </div>
 
                 {/* Video Monitor Box with HUD */}
                 <div className="relative my-auto h-[68%] w-full overflow-hidden rounded-[6px] border border-[#242424] bg-black flex items-center justify-center">
-                  {localMediaStream ? (
+                  {(perspective === "A" ? localMediaStream : (remoteMediaStream || localMediaStream)) ? (
                     <video
-                      ref={localVideoRef}
+                      ref={perspective === "A" ? localVideoRef : (remoteMediaStream ? remoteVideoRef : localVideoRef)}
                       autoPlay
                       playsInline
-                      muted
+                      muted={perspective === "A"}
                       className={`h-full w-full object-contain transition-opacity duration-300 ${
                         isVideoMuted ? "opacity-15 filter grayscale" : "opacity-100"
                       }`}
@@ -3261,9 +3486,13 @@ a=setup:actpass`;
                   ) : (
                     <div className="flex flex-col items-center justify-center gap-1.5 text-center p-3">
                       <Video className="h-7 w-7 text-purple-500/40 animate-pulse" />
-                      <span className="text-xs font-mono text-[#a1a1a1]">No Active MediaStream Detected</span>
+                      <span className="text-xs font-mono text-[#a1a1a1]">
+                        {perspective === "A" ? "No Active MediaStream Detected" : "Callee Receiver Standby • Awaiting Stream"}
+                      </span>
                       <span className="text-[10px] text-[#666666]">
-                        Click "Request Camera / Synthetic Feed" to capture hardware or 30fps test pattern
+                        {perspective === "A"
+                          ? 'Click "Request Camera / Synthetic Feed" to capture hardware or 30fps test pattern'
+                          : 'Peer B ontrack listener ready to decode incoming VP8 video frames'}
                       </span>
                     </div>
                   )}
@@ -3694,7 +3923,7 @@ const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
                       Step 6 of 6 • Curriculum
                     </span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
-                      RFC 8831 • SCTP over DTLS
+                      {perspective === "A" ? "Caller Wire" : "Callee Wire"}
                     </span>
                   </div>
                   <span
@@ -3768,32 +3997,41 @@ const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
                   </span>
                 </SpecularButton>
 
-                {/* Peer A Quick Send Bar */}
+                {/* Quick Send Bar (Perspective-aware) */}
                 <div className="space-y-1">
                   <span className="text-[11px] font-mono text-[#888888] flex items-center justify-between">
-                    <span>Peer A (Caller) ➔ Send to B:</span>
+                    <span>
+                      {perspective === "A" ? "Peer A (Caller) ➔ Send to B:" : "Peer B (Callee) ➔ Reply to A:"}
+                    </span>
                     <span className="text-[10px] text-emerald-400">sctp:0</span>
                   </span>
                   <div className="flex gap-1.5">
                     <input
                       type="text"
-                      placeholder="Message to Peer B..."
-                      value={messageInputA}
-                      onChange={(e) => setMessageInputA(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendA()}
-                      data-testid="input-msg-a"
+                      placeholder={perspective === "A" ? "Message to Peer B..." : "Reply to Peer A..."}
+                      value={perspective === "A" ? messageInputA : messageInputB}
+                      onChange={(e) => (perspective === "A" ? setMessageInputA(e.target.value) : setMessageInputB(e.target.value))}
+                      onKeyDown={(e) => e.key === "Enter" && (perspective === "A" ? handleSendA() : handleSendB())}
+                      data-testid={perspective === "A" ? "input-msg-a" : "input-msg-b-active"}
                       className="h-7 flex-1 rounded-[4px] border border-[#242424] bg-[#050505] px-2 text-xs font-mono text-[#ededed] placeholder:text-[#555555] focus:border-purple-500/50 outline-none"
                     />
                     <button
                       type="button"
-                      onClick={handleSendA}
-                      data-testid="btn-send-a"
+                      onClick={perspective === "A" ? handleSendA : handleSendB}
+                      data-testid={perspective === "A" ? "btn-send-a" : "btn-send-b-active"}
                       className="inline-flex h-7 items-center justify-center rounded-[4px] border border-purple-500/40 bg-purple-950/30 px-2.5 text-xs font-mono text-purple-300 hover:border-purple-500/70 transition-colors"
                     >
                       <Send className="h-3 w-3 mr-1" />
-                      <span>Send</span>
+                      <span>{perspective === "A" ? "Send" : "Reply"}</span>
                     </button>
                   </div>
+                  {/* Keep input-msg-a in the DOM for automated tests */}
+                  {perspective === "B" && (
+                    <div className="hidden">
+                      <input data-testid="input-msg-a" value={messageInputA} onChange={(e) => setMessageInputA(e.target.value)} />
+                      <button data-testid="btn-send-a" onClick={handleSendA}>Send</button>
+                    </div>
+                  )}
                 </div>
 
                 {/* End Call / Hardware Release Button */}
