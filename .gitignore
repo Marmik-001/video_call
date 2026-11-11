@@ -4,3 +4,4 @@ playwright-report/
 blob-report/
 dist/
 *.log
+.wrangler/
