@@ -19,6 +19,15 @@ export interface InterceptedCandidate {
   raw: string;
 }
 
+export interface ProCandidateStats {
+  total: number;
+  admitted: number;
+  blocked: number;
+  host: number;
+  srflx: number;
+  relay: number;
+}
+
 export interface ProLiveStats {
   stateA: RTCPeerConnectionState;
   stateB: RTCPeerConnectionState;
@@ -57,16 +66,31 @@ export class ProLiveService {
     blockRelay: false,
   };
 
+  public candidateStats: ProCandidateStats = {
+    total: 0,
+    admitted: 0,
+    blocked: 0,
+    host: 0,
+    srflx: 0,
+    relay: 0,
+  };
+
   private pollIntervalId: number | null = null;
   private prevBytesSent = 0;
   private prevTimestamp = 0;
 
   // Callbacks
   public onCandidateIntercepted?: (candidate: InterceptedCandidate) => void;
+  public onCandidateStatsChange?: (stats: ProCandidateStats) => void;
   public onStatsUpdated?: (stats: ProLiveStats) => void;
   public onRemoteStream?: (stream: MediaStream) => void;
   public onLocalStream?: (stream: MediaStream) => void;
-  public onConnectionStateChange?: (stateA: RTCPeerConnectionState, stateB: RTCPeerConnectionState) => void;
+  public onConnectionStateChange?: (
+    stateA: RTCPeerConnectionState,
+    stateB: RTCPeerConnectionState,
+    iceStateA: RTCIceConnectionState,
+    iceStateB: RTCIceConnectionState
+  ) => void;
 
   public updatePolicy(newPolicy: ProFirewallPolicy) {
     this.policy = { ...newPolicy };
@@ -74,6 +98,16 @@ export class ProLiveService {
 
   public async start(stream?: MediaStream) {
     this.stop();
+
+    this.candidateStats = {
+      total: 0,
+      admitted: 0,
+      blocked: 0,
+      host: 0,
+      srflx: 0,
+      relay: 0,
+    };
+    this.onCandidateStatsChange?.({ ...this.candidateStats });
 
     if (stream) {
       this.localStream = stream;
@@ -115,25 +149,45 @@ export class ProLiveService {
       }
     };
 
-    // State listeners
+    // State listeners (both peer connection and ice connection states)
     const notifyState = () => {
       if (this.peerA && this.peerB) {
-        this.onConnectionStateChange?.(this.peerA.connectionState, this.peerB.connectionState);
+        this.onConnectionStateChange?.(
+          this.peerA.connectionState,
+          this.peerB.connectionState,
+          this.peerA.iceConnectionState,
+          this.peerB.iceConnectionState
+        );
       }
     };
 
     this.peerA.onconnectionstatechange = notifyState;
     this.peerB.onconnectionstatechange = notifyState;
+    this.peerA.oniceconnectionstatechange = notifyState;
+    this.peerB.oniceconnectionstatechange = notifyState;
 
     // Buffer for Peer B candidates arriving before setRemoteDescription
     const bufferedForB: RTCIceCandidateInit[] = [];
     const bufferedForA: RTCIceCandidateInit[] = [];
+
+    const recordStats = (type: string, isBlocked: boolean) => {
+      this.candidateStats.total++;
+      if (type === "host") this.candidateStats.host++;
+      else if (type === "srflx") this.candidateStats.srflx++;
+      else if (type === "relay") this.candidateStats.relay++;
+
+      if (isBlocked) this.candidateStats.blocked++;
+      else this.candidateStats.admitted++;
+
+      this.onCandidateStatsChange?.({ ...this.candidateStats });
+    };
 
     // Peer A Candidate Filter Interceptor
     this.peerA.onicecandidate = async (e) => {
       if (!e.candidate) return;
       const parsed = parseIceCandidate(e.candidate.candidate);
       const isBlocked = this.evaluateFilter(parsed.type);
+      recordStats(parsed.type, isBlocked);
 
       const intercepted: InterceptedCandidate = {
         id: `cand-a-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -170,6 +224,7 @@ export class ProLiveService {
       if (!e.candidate) return;
       const parsed = parseIceCandidate(e.candidate.candidate);
       const isBlocked = this.evaluateFilter(parsed.type);
+      recordStats(parsed.type, isBlocked);
 
       const intercepted: InterceptedCandidate = {
         id: `cand-b-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,

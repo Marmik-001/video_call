@@ -32,6 +32,7 @@ import {
   proLiveService,
   type ProLiveStats,
   type InterceptedCandidate,
+  type ProCandidateStats,
 } from "@/services/proLive.service";
 import { createSyntheticMediaStream } from "@/utils/media.utils";
 
@@ -92,6 +93,15 @@ export const ProSimulatorLab: React.FC<ProSimulatorLabProps> = ({ onBackToBeginn
   const [liveConnected, setLiveConnected] = useState(false);
   const [liveStats, setLiveStats] = useState<ProLiveStats | null>(null);
   const [interceptedCandidates, setInterceptedCandidates] = useState<InterceptedCandidate[]>([]);
+  const [candidateStats, setCandidateStats] = useState<ProCandidateStats>({
+    total: 0,
+    admitted: 0,
+    blocked: 0,
+    host: 0,
+    srflx: 0,
+    relay: 0,
+  });
+  const [iceFailedDueToHairpinning, setIceFailedDueToHairpinning] = useState(false);
   const [useHardwareCamera, setUseHardwareCamera] = useState(true);
   const [mediaActive, setMediaActive] = useState(false);
 
@@ -124,17 +134,35 @@ export const ProSimulatorLab: React.FC<ProSimulatorLabProps> = ({ onBackToBeginn
       setInterceptedCandidates((prev) => [cand, ...prev.slice(0, 49)]);
     };
 
+    proLiveService.onCandidateStatsChange = (stats) => {
+      setCandidateStats(stats);
+    };
+
     proLiveService.onStatsUpdated = (stats) => {
       setLiveStats(stats);
     };
 
-    proLiveService.onConnectionStateChange = (stateA, stateB) => {
+    proLiveService.onConnectionStateChange = (stateA, stateB, iceStateA, iceStateB) => {
       if (stateA === "connected" && stateB === "connected") {
         setChipLabel("live_webrtc_wire_connected");
         setChipState("success");
-      } else if (stateA === "failed" || stateB === "failed") {
-        setChipLabel("live_webrtc_wire_failed");
-        setChipState("error");
+        setIceFailedDueToHairpinning(false);
+      } else if (
+        stateA === "failed" ||
+        stateB === "failed" ||
+        iceStateA === "failed" ||
+        iceStateB === "failed" ||
+        iceStateA === "disconnected" ||
+        iceStateB === "disconnected"
+      ) {
+        if (blockHost) {
+          setIceFailedDueToHairpinning(true);
+          setChipLabel("stun_hairpinning_failed_router_blocked");
+          setChipState("error");
+        } else {
+          setChipLabel("live_webrtc_wire_failed");
+          setChipState("error");
+        }
       }
     };
 
@@ -585,16 +613,59 @@ export const ProSimulatorLab: React.FC<ProSimulatorLabProps> = ({ onBackToBeginn
                     />
                     <span>Block TURN Relay Candidates</span>
                   </div>
-                  <span className="text-[10px] text-[#777777]">typ relay</span>
+                  <div className="flex items-center gap-1.5">
+                    {engineMode === "live" && (
+                      <span className="text-[9px] px-1 py-0.2 rounded border border-amber-500/40 bg-amber-950/40 text-amber-300 font-mono">
+                        Simulated Only
+                      </span>
+                    )}
+                    <span className="text-[10px] text-[#777777]">typ relay</span>
+                  </div>
                 </label>
               </div>
 
+              {/* Live Wire TURN Notice */}
+              {engineMode === "live" && (
+                <div className="p-1.5 rounded border border-amber-500/30 bg-amber-950/20 text-[10px] text-amber-200 font-mono leading-tight space-y-0.5">
+                  <div className="flex items-center gap-1 font-bold text-amber-300">
+                    <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0" />
+                    <span>TURN Live Wire Unavailable (Simulated Only)</span>
+                  </div>
+                  <p className="text-[9px] text-[#a1a1a1]">
+                    Real TURN requires a hosted relay server (coturn / Twilio). Because this app is 100% client-side, Live Wire cannot relay through TURN. Switch to <strong>Simulation Matrix</strong> for TURN benchmarks!
+                  </p>
+                </div>
+              )}
+
+              {/* Host Filter & Hairpinning Status in Live Wire */}
               {blockHost && (
-                <div className="p-1.5 rounded border border-cyan-500/30 bg-cyan-950/20 text-[10px] text-cyan-200 font-mono leading-tight flex items-start gap-1.5">
-                  <Info className="h-3.5 w-3.5 text-cyan-400 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Host Filter Active:</strong> Forces peers to bypass LAN and negotiate connectivity checks via STUN Public IP (`srflx`) through router hairpinning!
-                  </span>
+                <div className="p-2 rounded border border-cyan-500/30 bg-cyan-950/20 text-[10px] text-cyan-200 font-mono leading-tight space-y-1.5">
+                  <div className="flex items-center justify-between font-bold text-cyan-300">
+                    <div className="flex items-center gap-1">
+                      <Info className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                      <span>Host Filter Active (Public IP Test):</span>
+                    </div>
+                    {engineMode === "live" && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/70 border border-cyan-500/40 text-cyan-200">
+                        {candidateStats.srflx} srflx passed • {candidateStats.host} host dropped
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[#cccccc] text-[10px]">
+                    All LAN candidates dropped. Chromium is forced to attempt peer-to-peer connectivity via your STUN-reflected Public IP.
+                  </p>
+
+                  {engineMode === "live" && (iceFailedDueToHairpinning || (liveConnected && !liveStats?.nominatedPair)) && (
+                    <div className="p-1.5 rounded bg-black/80 border border-red-500/40 text-red-200 text-[10px] space-y-1 mt-1">
+                      <div className="font-bold text-red-300 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 text-red-400 shrink-0" />
+                        <span>Negotiation Failed (NAT Hairpinning Blocked)</span>
+                      </div>
+                      <p className="text-[#a1a1a1] text-[9px] leading-tight">
+                        Your home router / ISP NAT refused to loopback packets sent to your own public IP. This is expected on ~20% of consumer networks and why TURN relaying is mandatory for WebRTC in production!
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
