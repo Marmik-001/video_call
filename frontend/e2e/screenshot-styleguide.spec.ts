@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 test("capture styleguide screenshots at desktop and mobile viewports", async ({ page }) => {
-  test.setTimeout(90000);
+  test.setTimeout(120000);
   const screenshotsDir = path.resolve(__dirname, "../../docs/screenshots");
 
   // 1. Desktop 1280x900
@@ -158,7 +158,47 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     fullPage: false,
   });
 
-  // 6. Beginner Lab with React Bits (Mobile)
+  // 6. Step 4 NAT & STUN Packet Rewriter Bento
+  await page.locator("header").getByRole("button", { name: "Next" }).click();
+  await page.waitForSelector("text=The Apartment Front Desk (NAT Basics)");
+  await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelectorAll('*').forEach((el) => {
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    });
+  });
+
+  // Trigger outbound packet through NAT to activate pinhole
+  await page.locator("button:has-text('Send Outbound Packet through NAT')").click();
+  await page.waitForTimeout(1100);
+
+  // Capture Step 4 Active: Live Mapping Table
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step4-active-table.png"),
+    fullPage: false,
+  });
+
+  // Switch to 4 NAT Types
+  await page.locator("button:has-text('4 NAT Types')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step4-active-types.png"),
+    fullPage: false,
+  });
+
+  // Switch to STUN Packet X-Ray
+  await page.locator("button:has-text('STUN Packet X-Ray')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step4-active-stun.png"),
+    fullPage: false,
+  });
+
+  // 7. Beginner Lab with React Bits (Mobile)
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: path.join(screenshotsDir, "beginner-lab-react-bits-mobile.png"),

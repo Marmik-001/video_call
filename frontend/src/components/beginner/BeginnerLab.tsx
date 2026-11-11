@@ -38,6 +38,8 @@ import {
   FileCode,
   ArrowLeftRight,
   ShieldCheck,
+  Shield,
+  ShieldAlert,
   GitCompare,
   Cpu,
   Copy,
@@ -408,6 +410,146 @@ a=setup:actpass`;
     },
   ];
 
+  // Step 4 NAT Basics State
+  const [step4Tab, setStep4Tab] = useState<"table" | "types" | "stun">("table");
+  const [selectedNatTypeIndex, setSelectedNatTypeIndex] = useState<number>(0);
+  const [natPinholeActive, setNatPinholeActive] = useState<boolean>(false);
+  const [natPacketInFlight, setNatPacketInFlight] = useState<boolean>(false);
+
+  const natMappingEntries = [
+    {
+      id: "nat-01",
+      internal: "192.168.1.15:54321",
+      external: "103.21.44.12:49152",
+      destination: "stun.l.google.com:19302",
+      protocol: "UDP",
+      ttl: natPinholeActive ? "28s" : "Expired",
+      state: natPinholeActive ? "Active Pinhole" : "Idle",
+      stateColor: natPinholeActive
+        ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-400 font-bold"
+        : "border-[#262626] bg-[#141414] text-[#666666]",
+      description: "STUN binding request opened return route for inbound WebRTC packets.",
+    },
+    {
+      id: "nat-02",
+      internal: "192.168.1.15:51200",
+      external: "103.21.44.12:51200",
+      destination: "10.0.0.42:62400 (Peer B)",
+      protocol: "UDP",
+      ttl: "Standby",
+      state: "Pinhole Punching",
+      stateColor: "border-purple-500/30 bg-purple-950/20 text-purple-300",
+      description: "Direct P2P socket awaiting simultaneous punch from Peer B.",
+    },
+    {
+      id: "nat-03",
+      internal: "192.168.1.15:443",
+      external: "103.21.44.12:58210",
+      destination: "turn.relay.lab:3478",
+      protocol: "TLS/TCP",
+      ttl: "120s",
+      state: "Tunnel Standby",
+      stateColor: "border-cyan-500/30 bg-cyan-950/20 text-cyan-300",
+      description: "Fallback TURN control channel for strict enterprise firewalls.",
+    },
+    {
+      id: "nat-04",
+      internal: "192.168.1.100:80",
+      external: "103.21.44.12:80",
+      destination: "Any (Full Cone)",
+      protocol: "TCP",
+      ttl: "Static",
+      state: "Static Port Forward",
+      stateColor: "border-[#333333] bg-[#161616] text-[#888888]",
+      description: "Manual router port forwarding rule (not used by dynamic WebRTC).",
+    },
+  ];
+
+  const natTypeEntries = [
+    {
+      type: "Port-Restricted Cone NAT",
+      badge: "Standard Wi-Fi (95% of Homes)",
+      p2pFeasibility: "95% Success",
+      feasibilityColor: "text-emerald-400 border-emerald-500/30 bg-emerald-950/20",
+      behavior: "Outbound UDP to IP_X:Port_Y opens an inbound pinhole exclusively for packets coming from that exact IP_X and Port_Y.",
+      p2pVerdict: "P2P Hole Punching works! Both peers must send packets towards each other's reflexive socket to open mutual pinholes.",
+      icon: <ShieldCheck className="h-4 w-4 text-emerald-400" />,
+      rfc: "RFC 4787 §5",
+      example: "Standard Asus, Netgear, TP-Link home routers.",
+    },
+    {
+      type: "Address-Restricted Cone NAT",
+      badge: "Lenient (Moderate)",
+      p2pFeasibility: "99% Success",
+      feasibilityColor: "text-emerald-400 border-emerald-500/30 bg-emerald-950/20",
+      behavior: "Outbound packet to IP_X opens a pinhole for any port on IP_X. Inbound packets from IP_X are accepted regardless of source port.",
+      p2pVerdict: "Easy P2P hole punching. Once Peer A sends to Peer B's public IP, any incoming port from Peer B passes through.",
+      icon: <Globe className="h-4 w-4 text-cyan-400" />,
+      rfc: "RFC 3489 §5",
+      example: "Older consumer routers, some DSL modems.",
+    },
+    {
+      type: "Full Cone NAT (1-to-1)",
+      badge: "Most Permissive",
+      p2pFeasibility: "100% Success",
+      feasibilityColor: "text-emerald-400 border-emerald-500/30 bg-emerald-950/20",
+      behavior: "Once an internal IP:port is mapped to public IP:port, any external computer on the entire internet can send packets to it.",
+      p2pVerdict: "Zero hole punching needed. Acts like a direct public IP. Rare in modern consumer hardware due to security risks.",
+      icon: <Radio className="h-4 w-4 text-purple-400" />,
+      rfc: "RFC 3489 §5",
+      example: "Dedicated DMZ settings, 1-to-1 cloud NAT gateways.",
+    },
+    {
+      type: "Symmetric NAT",
+      badge: "Strict Enterprise / 4G Carrier",
+      p2pFeasibility: "0% Direct P2P (Requires TURN)",
+      feasibilityColor: "text-red-400 border-red-500/30 bg-red-950/20",
+      behavior: "Allocates a DIFFERENT public port for every unique destination IP:port you contact. Port mapped for STUN does not match Peer B!",
+      p2pVerdict: "Direct P2P hole punching is impossible because neither peer can predict the port allocated for the other. Relays via TURN.",
+      icon: <ShieldAlert className="h-4 w-4 text-red-400" />,
+      rfc: "RFC 4787 §4.1",
+      example: "Corporate firewalls, university dorms, cellular 4G/5G carrier-grade NAT (CGNAT).",
+    },
+  ];
+
+  const stunPacketFields = [
+    {
+      token: "0x0001",
+      name: "STUN Message Type: Binding Request",
+      category: "Header",
+      meaning: "Tells the STUN server to inspect the source UDP packet and reflect its IP and port.",
+      rfc: "RFC 8489 §6",
+    },
+    {
+      token: "0x2112A442",
+      name: "Magic Cookie",
+      category: "Header",
+      meaning: "Fixed 32-bit value that distinguishes STUN traffic from raw RTP packets and allows detection of NATs that inspect payloads.",
+      rfc: "RFC 8489 §5",
+    },
+    {
+      token: "0x9E4B...72A1",
+      name: "96-bit Transaction ID",
+      category: "Header",
+      meaning: "Random cryptographically secure ID used to correlate the binding request with the matching binding response.",
+      rfc: "RFC 8489 §5",
+    },
+    {
+      token: "0x0020",
+      name: "XOR-MAPPED-ADDRESS Attribute",
+      category: "Attribute",
+      meaning: "Reflects the client's public IP and port obfuscated by XORing with the magic cookie to prevent smart ALGs from altering it.",
+      rfc: "RFC 8489 §14.2",
+    },
+    {
+      token: "103.21.44.12:49152",
+      name: "Decoded Public Reflexive Tuple",
+      category: "Payload",
+      meaning: "The actual external IP and port assigned to Peer A's laptop by the home router NAT gateway.",
+      rfc: "RFC 8489 §14.2",
+    },
+  ];
+
   // Video Refs for Step 5
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -623,6 +765,7 @@ a=setup:actpass`;
 
   // Step 4 NAT packet trigger with CallChip feedback & explanation
   const handleTriggerNatSimulation = () => {
+    setNatPacketInFlight(true);
     setCallChipLabel("nat_rewriting_packet_header");
     setCallChipState("running");
 
@@ -634,6 +777,8 @@ a=setup:actpass`;
     });
 
     setTimeout(() => {
+      setNatPinholeActive(true);
+      setNatPacketInFlight(false);
       setCallChipLabel("pinhole_active_103.21.44.12:49152");
       setCallChipState("success");
       setCallChipDuration(1100);
@@ -644,7 +789,7 @@ a=setup:actpass`;
         badge: "PINHOLE OPEN",
         timestamp: new Date().toLocaleTimeString(),
       });
-    }, 1100);
+    }, 900);
   };
 
   // Step 5 Media capture trigger
@@ -2312,12 +2457,482 @@ a=setup:actpass`;
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : currentStep === 4 ? (
           /* ============================================================== */
-          /* STEPS 4-6: THE ACTIVE WEBRTC EXPERIMENTATION ARENA (BENTO)     */
+          /* STEP 4: THE APARTMENT FRONT DESK (NAT BASICS) (Morphing Bento) */
           /* ============================================================== */
           <motion.div
-            key="steps-4-6-bento"
+            key="step-4-bento"
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 min-h-0 h-full w-full grid grid-cols-12 grid-rows-1 gap-2.5"
+          >
+            {/* LEFT HERO: BASELINE EXPLANATION & ACTION DECK (Col 5) */}
+            <div className="col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col justify-between rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 shadow-sm overflow-hidden">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between border-b border-[#222222] pb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-purple-500/30 bg-purple-950/30 text-purple-400 shrink-0 shadow-[0_0_8px_rgba(168,85,247,0.2)]">
+                      <Shield className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Radio className="h-4 w-4 text-purple-400" />
+                        <span className="text-sm sm:text-base font-bold text-[#ededed]">
+                          Step 4 • The Apartment Front Desk (NAT Basics)
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-[#888888]">Curriculum • Phase: NAT Translation & Pinhole Punching</span>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 text-purple-300 font-semibold shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                    <Zap className="h-3.5 w-3.5 text-purple-400" />
+                    <span>RFC 3022 • NAT</span>
+                  </span>
+                </div>
+
+                {/* Dedicated 2-Line "Why Are We Doing This?" Card */}
+                <div className="rounded-[8px] border border-purple-500/40 bg-gradient-to-r from-purple-950/30 via-purple-900/10 to-transparent p-2.5 space-y-1 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-300">
+                    <Target className="h-4 w-4 text-purple-400" />
+                    <span>Why Are We Doing This?</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed">
+                    Millions of homes share private IPs like <code>192.168.x.x</code> that are impossible to reach from outside.
+                    Your home router rewrites packet headers through NAT and punches a temporary return <strong>pinhole</strong> so peers can stream video back!
+                  </p>
+                </div>
+
+                {/* The Core Problem & Baseline */}
+                <div className="space-y-1">
+                  <h3 className="text-sm sm:text-base font-semibold text-[#ededed] flex items-center gap-1.5">
+                    <HelpCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span>The One-Way Mirror Firewall Dilemma</span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#a1a1a1] leading-relaxed">
+                    By default, your home firewall silently drops unsolicited incoming packets from strangers. To receive video from Peer B, <strong className="text-[#ededed]">Peer A must first send an outbound packet through the router</strong>, which registers a 30-second stateful pinhole allowing Peer B's reply.
+                  </p>
+                </div>
+
+                {/* Mental Model & Analogy */}
+                <div className="rounded-[8px] border border-[#222222] bg-[#121212] p-2.5 space-y-1 text-xs sm:text-sm">
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                    <span>Mental Model & Analogy</span>
+                  </span>
+                  <p className="text-[#ededed] italic leading-relaxed">
+                    "Your apartment building has one street address, but individual apartment numbers are secret from outside delivery drivers until the front desk logs your outgoing request."
+                  </p>
+                </div>
+
+                {/* The WebRTC Rule */}
+                <div className="text-xs sm:text-sm font-mono text-[#888888] space-y-0.5 border-l-2 border-purple-500/60 pl-2.5 py-0.5">
+                  <p className="flex items-start gap-1.5">
+                    <Key className="h-3.5 w-3.5 text-purple-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-[#ededed]">Key Protocol Fact:</strong> NAT pinholes have finite lease timers (usually 30–60s). WebRTC sends periodic <span className="underline decoration-purple-500 text-purple-200">STUN Consent Freshness</span> keep-alive pings (RFC 7675) every 2.5 seconds to keep the pinhole alive!
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Numbered Action Directives */}
+              <div className="space-y-2 pt-2 border-t border-[#1e1e1e]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase text-[#777777] flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Interactive Directives</span>
+                  </span>
+                  <span className="text-xs font-mono text-purple-400 font-medium">Outbound Translation</span>
+                </div>
+
+                <div className="flex gap-2">
+                  <SpecularButton
+                    onClick={handleTriggerNatSimulation}
+                    className="flex-1 h-9 text-xs sm:text-sm font-semibold"
+                  >
+                    <Radio className="h-3.5 w-3.5 mr-1 text-purple-400" />
+                    <span>Send Outbound Packet through NAT</span>
+                  </SpecularButton>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNatTypeIndex((prev) => (prev + 1) % natTypeEntries.length)}
+                    className="px-3.5 h-9 rounded-[6px] border border-[#242424] bg-[#141414] text-xs sm:text-sm font-mono text-[#ededed] hover:border-[#404040] hover:bg-[#1a1a1a] transition-all flex items-center gap-1.5"
+                    title="Cycle NAT Router Types"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>NAT Type ({selectedNatTypeIndex + 1}/{natTypeEntries.length})</span>
+                  </button>
+                </div>
+
+                {/* Action Reaction Feed */}
+                <div className="rounded-[8px] border border-[#262626] bg-[#111111] p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span className="text-xs sm:text-sm font-semibold text-[#ededed]">
+                        {lastReaction.title}
+                      </span>
+                    </div>
+                    {lastReaction.badge && (
+                      <span className="rounded bg-[#1c1c1c] px-2 py-0.5 text-xs font-mono text-purple-300 border border-[#2c2c2c]">
+                        {lastReaction.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] font-mono leading-relaxed">
+                    {lastReaction.detail}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: SIMULATION STAGE & NAT DEEP X-RAY (Col 7) */}
+            <div className="col-span-12 lg:col-span-7 h-full min-h-0 flex flex-col gap-2.5">
+              {/* TOP: NAT PINHOLE & REWRITER STAGE (Height ~42%) */}
+              <div className="h-[42%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed]">
+                      NAT Pinhole & Packet Rewriting Engine
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                    [ILLUSTRATION: Educational Animation]
+                  </span>
+                </div>
+
+                {/* Visual 3-Node Packet Transformation Highway */}
+                <div className="relative my-auto flex items-center justify-between px-3 py-1">
+                  {/* Node 1: Private LAN (Peer A) */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-36">
+                    <div className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] border border-emerald-500/40 bg-emerald-950/20 text-emerald-300">
+                      <Laptop className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <div className="text-left font-mono truncate">
+                        <div className="text-[11px] font-semibold text-[#ededed]">Private LAN</div>
+                        <div className="text-[10px] text-[#888888] truncate">192.168.1.15:54321</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Wire 1: LAN to Router */}
+                  <div className="relative flex-1 h-[2px] bg-[#222222] mx-2">
+                    {natPacketInFlight && (
+                      <motion.div
+                        className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,1)] absolute -top-1"
+                        initial={{ left: "0%" }}
+                        animate={{ left: "100%" }}
+                        transition={{ duration: 0.45, ease: "easeInOut" }}
+                      />
+                    )}
+                    <div className="absolute left-1/2 -top-3 -translate-x-1/2 px-1.5 py-0.2 rounded bg-[#111111] text-[9px] font-mono text-[#777777] border border-[#202020] whitespace-nowrap">
+                      Src: 192.168.1.15:54321
+                    </div>
+                  </div>
+
+                  {/* Node 2: NAT Gateway Router */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-44">
+                    <div className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-[6px] border transition-all ${
+                      natPinholeActive
+                        ? "border-purple-500/60 bg-purple-950/30 text-purple-200 shadow-[0_0_12px_rgba(168,85,247,0.3)]"
+                        : "border-[#262626] bg-[#121212] text-[#888888]"
+                    }`}>
+                      <Server className="h-4 w-4 text-purple-400 shrink-0" />
+                      <div className="text-left font-mono">
+                        <div className="text-[11px] font-semibold text-[#ededed] flex items-center gap-1">
+                          <span>NAT Gateway</span>
+                        </div>
+                        <div className="text-[10px] text-[#888888]">103.21.44.12:49152</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Wire 2: Router to STUN Server */}
+                  <div className="relative flex-1 h-[2px] bg-[#222222] mx-2">
+                    {natPacketInFlight && (
+                      <motion.div
+                        className="h-2.5 w-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,1)] absolute -top-1"
+                        initial={{ left: "0%" }}
+                        animate={{ left: "100%" }}
+                        transition={{ duration: 0.45, delay: 0.45, ease: "easeInOut" }}
+                      />
+                    )}
+                    <div className="absolute left-1/2 -top-3 -translate-x-1/2 px-1.5 py-0.2 rounded bg-[#111111] text-[9px] font-mono text-purple-300 border border-purple-500/30 whitespace-nowrap">
+                      Rewritten: 103.21.44.12:49152
+                    </div>
+                  </div>
+
+                  {/* Node 3: Public STUN Server */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-40">
+                    <div className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] border border-cyan-500/40 bg-cyan-950/20 text-cyan-300">
+                      <Globe className="h-4 w-4 text-cyan-400 shrink-0" />
+                      <div className="text-left font-mono truncate">
+                        <div className="text-[11px] font-semibold text-[#ededed]">STUN Reflector</div>
+                        <div className="text-[10px] text-[#888888] truncate">stun.l.google.com</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Chips Row */}
+                <div className="grid grid-cols-4 gap-2 pt-1 border-t border-[#1e1e1e]">
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Shield className="h-3 w-3 text-purple-400" />
+                      <span>NAT Type</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono truncate">Port-Restricted</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Globe className="h-3 w-3 text-cyan-400" />
+                      <span>Public WAN IP</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">103.21.44.12</div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      <span>Pinhole State</span>
+                    </div>
+                    <div className={`text-xs font-bold font-mono ${natPinholeActive ? "text-emerald-400" : "text-[#777777]"}`}>
+                      {natPinholeActive ? "UDP:49152 Active" : "Standby"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Clock className="h-3 w-3 text-amber-400" />
+                      <span>Lease TTL</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono">
+                      {natPinholeActive ? "28s Remaining" : "30s Default"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BOTTOM: NAT DEEP X-RAY & TRANSLATION INSPECTOR (Height ~58%) */}
+              <div className="h-[58%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
+                      <span>NAT Translation State & Protocol Inspector</span>
+                    </span>
+                  </div>
+
+                  {/* Mode Switcher Tabs */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center rounded-[6px] bg-[#141414] p-0.5 border border-[#222222]">
+                      <button
+                        type="button"
+                        onClick={() => setStep4Tab("table")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step4Tab === "table"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Layers className="h-3.5 w-3.5" />
+                        <span>Live Mapping Table</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep4Tab("types")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step4Tab === "types"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        <span>4 NAT Types</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep4Tab("stun")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step4Tab === "stun"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <FileCode className="h-3.5 w-3.5" />
+                        <span>STUN Packet X-Ray</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tab Content Display */}
+                <div className="flex-1 min-h-0 pt-2 overflow-hidden">
+                  {/* TAB 1: LIVE NAT MAPPING TABLE */}
+                  {step4Tab === "table" && (
+                    <div className="h-full overflow-y-auto space-y-1.5">
+                      <div className="grid grid-cols-12 gap-2 text-xs font-mono font-semibold text-[#888888] pb-1 border-b border-[#222222]">
+                        <div className="col-span-3">Internal Tuple (LAN)</div>
+                        <div className="col-span-3 text-purple-300">Public Mapped Tuple</div>
+                        <div className="col-span-3 text-cyan-300">Target Destination</div>
+                        <div className="col-span-3 text-emerald-400">TTL & State</div>
+                      </div>
+
+                      {natMappingEntries.map((row) => (
+                        <div
+                          key={row.id}
+                          className="grid grid-cols-12 gap-2 rounded-[6px] border border-[#1e1e1e] bg-[#0c0c0c] p-2 text-xs font-mono items-center"
+                        >
+                          <div className="col-span-3 text-[#ededed] font-semibold truncate">{row.internal}</div>
+                          <div className="col-span-3 text-purple-300 bg-purple-950/20 px-2 py-0.5 rounded border border-purple-500/20 truncate">
+                            {row.external}
+                          </div>
+                          <div className="col-span-3 text-cyan-300 truncate">{row.destination}</div>
+                          <div className="col-span-3 flex items-center justify-between">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${row.stateColor}`}>
+                              {row.state}
+                            </span>
+                            <span className="text-[11px] text-[#888888] font-bold">{row.ttl}</span>
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="text-xs font-mono text-[#888888] p-2 rounded bg-black/60 border border-[#1a1a1a] flex items-center gap-1.5">
+                        <Info className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                        <span>Clicking 'Send Outbound Packet through NAT' creates an ephemeral translation rule in the router table above.</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: 4 NAT TYPES COMPARISON */}
+                  {step4Tab === "types" && (
+                    <div className="h-full grid grid-cols-12 gap-2.5">
+                      {/* Left Sub-Col: List of 4 NAT Types */}
+                      <div className="col-span-5 h-full overflow-y-auto space-y-1.5 pr-1">
+                        {natTypeEntries.map((nat, idx) => (
+                          <button
+                            key={nat.type}
+                            type="button"
+                            onClick={() => setSelectedNatTypeIndex(idx)}
+                            className={`w-full text-left rounded-[6px] p-2 border transition-all flex flex-col gap-1 ${
+                              selectedNatTypeIndex === idx
+                                ? "border-purple-500/50 bg-purple-950/20 text-[#ededed] shadow-sm"
+                                : "border-[#202020] bg-[#0d0d0d] text-[#888888] hover:border-[#333333] hover:text-[#ededed]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                {nat.icon}
+                                <span className="font-semibold text-xs text-[#ededed]">{nat.type}</span>
+                              </div>
+                              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${nat.feasibilityColor}`}>
+                                {nat.p2pFeasibility}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-mono text-[#888888] truncate">{nat.badge}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Right Sub-Col: Deep NAT Type Explainer */}
+                      <div className="col-span-7 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#0c0c0c] p-3 space-y-2.5">
+                        {(() => {
+                          const active = natTypeEntries[selectedNatTypeIndex] || natTypeEntries[0];
+                          return (
+                            <>
+                              <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                                <div className="flex items-center gap-2">
+                                  {active.icon}
+                                  <span className="font-semibold text-sm text-[#ededed]">{active.type}</span>
+                                </div>
+                                <span className="text-xs font-mono px-2 py-0.5 rounded bg-purple-950/40 text-purple-300 border border-purple-500/30">
+                                  {active.rfc}
+                                </span>
+                              </div>
+
+                              {/* Filtering Rule */}
+                              <div className="space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                                  <Info className="h-3.5 w-3.5 text-cyan-400" />
+                                  <span>Firewall Filtering Behavior</span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-[#ededed] leading-relaxed pl-2 border-l-2 border-purple-500/60">
+                                  {active.behavior}
+                                </p>
+                              </div>
+
+                              {/* P2P Hole Punching Verdict */}
+                              <div className="space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                                  <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+                                  <span>WebRTC P2P Feasibility Verdict</span>
+                                </div>
+                                <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                                  {active.p2pVerdict}
+                                </p>
+                              </div>
+
+                              {/* Hardware Examples */}
+                              <div className="rounded-[6px] border border-cyan-500/20 bg-cyan-950/10 p-2 space-y-0.5">
+                                <div className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                                  <Server className="h-3.5 w-3.5 text-cyan-400" />
+                                  <span>Typical Real-World Environments</span>
+                                </div>
+                                <p className="text-xs text-[#a1a1a1] font-mono">
+                                  {active.example}
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: STUN PACKET X-RAY */}
+                  {step4Tab === "stun" && (
+                    <div className="h-full overflow-y-auto space-y-2">
+                      <div className="grid grid-cols-12 gap-2 text-xs font-mono font-semibold text-[#888888] pb-1 border-b border-[#222222]">
+                        <div className="col-span-3">Field Token</div>
+                        <div className="col-span-4 text-purple-300">RFC 8489 Header/Attribute Name</div>
+                        <div className="col-span-5 text-cyan-300">Protocol Significance</div>
+                      </div>
+
+                      {stunPacketFields.map((field, i) => (
+                        <div
+                          key={i}
+                          className="grid grid-cols-12 gap-2 rounded-[6px] border border-[#1e1e1e] bg-[#0c0c0c] p-2 text-xs font-mono items-center"
+                        >
+                          <div className="col-span-3 font-bold text-purple-300 bg-black/60 px-2 py-1 rounded border border-purple-500/30 truncate">
+                            {field.token}
+                          </div>
+                          <div className="col-span-4 text-[#ededed] font-semibold">{field.name}</div>
+                          <div className="col-span-5 text-[#a1a1a1] leading-normal text-[11px]">{field.meaning}</div>
+                        </div>
+                      ))}
+
+                      <div className="text-xs font-mono text-[#888888] p-2 rounded bg-black/60 border border-[#1a1a1a] flex items-center gap-1.5">
+                        <Info className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                        <span>STUN uses XOR-MAPPED-ADDRESS instead of plain MAPPED-ADDRESS to prevent NAT routers with Application Layer Gateways (ALGs) from modifying the IP payload.</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          /* ============================================================== */
+          /* STEPS 5-6: THE ACTIVE WEBRTC EXPERIMENTATION ARENA (BENTO)     */
+          /* ============================================================== */
+          <motion.div
+            key="steps-5-6-bento"
             layout
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
