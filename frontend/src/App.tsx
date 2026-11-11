@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
 import { BeginnerLab } from "./components/beginner/BeginnerLab";
+import { ProSimulatorLab } from "./components/pro/ProSimulatorLab";
 import { Styleguide } from "./components/styleguide/Styleguide";
 
 function App() {
-  const [currentView, setCurrentView] = useState<"lab" | "styleguide">(() => {
+  const [currentView, setCurrentView] = useState<"lab" | "pro" | "styleguide">(() => {
     if (typeof window !== "undefined") {
       const path = window.location.pathname;
       const hash = window.location.hash;
       if (path === "/styleguide" || hash === "#styleguide") {
         return "styleguide";
+      }
+      if (path === "/pro" || hash === "#pro") {
+        return "pro";
       }
     }
     return "lab";
@@ -20,6 +24,8 @@ function App() {
       const hash = window.location.hash;
       if (path === "/styleguide" || hash === "#styleguide") {
         setCurrentView("styleguide");
+      } else if (path === "/pro" || hash === "#pro") {
+        setCurrentView("pro");
       } else {
         setCurrentView("lab");
       }
@@ -33,10 +39,12 @@ function App() {
     };
   }, []);
 
-  const navigateTo = (view: "lab" | "styleguide") => {
+  const navigateTo = (view: "lab" | "pro" | "styleguide") => {
     setCurrentView(view);
     if (view === "styleguide") {
       window.history.pushState(null, "", "/styleguide");
+    } else if (view === "pro") {
+      window.history.pushState(null, "", "/pro");
     } else {
       window.history.pushState(null, "", "/");
     }
@@ -51,7 +59,7 @@ function App() {
           onClick={() => navigateTo("styleguide")}
           className={`rounded-full px-3 py-1 text-xs font-mono font-medium transition-colors ${
             currentView === "styleguide"
-              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+              ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
               : "text-text-muted hover:text-text-main"
           }`}
         >
@@ -62,15 +70,33 @@ function App() {
           onClick={() => navigateTo("lab")}
           className={`rounded-full px-3 py-1 text-xs font-mono font-medium transition-colors ${
             currentView === "lab"
-              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+              ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
               : "text-text-muted hover:text-text-main"
           }`}
         >
           Beginner Lab
         </button>
+        <button
+          type="button"
+          data-testid="nav-pro-simulator"
+          onClick={() => navigateTo("pro")}
+          className={`rounded-full px-3 py-1 text-xs font-mono font-medium transition-colors ${
+            currentView === "pro"
+              ? "bg-purple-500/30 text-purple-200 border border-purple-400/50 shadow-[0_0_12px_rgba(168,85,247,0.3)]"
+              : "text-text-muted hover:text-text-main"
+          }`}
+        >
+          ⚡ Pro Simulator
+        </button>
       </div>
 
-      {currentView === "styleguide" ? <Styleguide /> : <BeginnerLab />}
+      {currentView === "styleguide" ? (
+        <Styleguide />
+      ) : currentView === "pro" ? (
+        <ProSimulatorLab onBackToBeginner={() => navigateTo("lab")} />
+      ) : (
+        <BeginnerLab />
+      )}
     </div>
   );
 }

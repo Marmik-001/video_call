@@ -1236,6 +1236,19 @@ a=setup:actpass`;
             <span className="hidden md:inline">Reset</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              window.history.pushState(null, "", "/pro");
+              window.dispatchEvent(new Event("popstate"));
+            }}
+            data-testid="btn-launch-pro"
+            className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-purple-500/40 bg-purple-950/30 px-2.5 text-xs font-mono font-medium text-purple-300 hover:bg-purple-900/40 hover:border-purple-400 transition-all shadow-[0_0_10px_rgba(168,85,247,0.15)]"
+          >
+            <span className="text-purple-400">⚡</span>
+            <span>Pro Mode</span>
+          </button>
+
           <div className="flex items-center gap-1 border-l border-[#242424] pl-2">
             <button
               type="button"
