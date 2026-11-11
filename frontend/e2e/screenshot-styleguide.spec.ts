@@ -239,7 +239,48 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     fullPage: false,
   });
 
-  // 8. Beginner Lab with React Bits (Mobile)
+  // 8. Step 6 The Direct Wire Bento
+  await page.locator("header").getByRole("button", { name: "Next" }).click();
+  await page.waitForSelector("text=The Direct Wire (Data Channels)");
+  await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelectorAll('*').forEach((el) => {
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    });
+  });
+
+  // Send message on DataChannel
+  await page.getByTestId("input-msg-a").fill("Hello Peer B! Direct P2P wire active.");
+  await page.getByTestId("btn-send-a").click();
+  await page.waitForTimeout(500);
+
+  // Capture Step 6 Active: Live Chat Terminal
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step6-active-chat.png"),
+    fullPage: false,
+  });
+
+  // Switch to SCTP Stack
+  await page.locator("button:has-text('SCTP Stack')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step6-active-sctp.png"),
+    fullPage: false,
+  });
+
+  // Switch to getStats()
+  await page.locator("button:has-text('getStats()')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step6-active-stats.png"),
+    fullPage: false,
+  });
+
+  // 9. Beginner Lab with React Bits (Mobile)
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: path.join(screenshotsDir, "beginner-lab-react-bits-mobile.png"),

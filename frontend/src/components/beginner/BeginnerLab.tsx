@@ -52,8 +52,9 @@ import {
   Sliders,
   Volume2,
   VolumeX,
+  PhoneOff,
 } from "lucide-react";
-import { useLabStore, type CandidateInfo } from "@/store/labStore";
+import { useLabStore } from "@/store/labStore";
 import { loopbackService } from "@/services/loopback.service";
 import { createSyntheticMediaStream } from "@/utils/media.utils";
 import { Stepper, type StepItem } from "@/components/react-bits/Stepper";
@@ -84,7 +85,6 @@ export const BeginnerLab: React.FC = () => {
     setStep,
     isPaused,
     setIsPaused,
-    mailbox,
     gatheredCandidates,
     sdpOffer,
     sdpAnswer,
@@ -99,8 +99,6 @@ export const BeginnerLab: React.FC = () => {
 
   const [messageInputA, setMessageInputA] = useState("");
   const [messageInputB, setMessageInputB] = useState("");
-  const [selectedPacketIndex, setSelectedPacketIndex] = useState<number | null>(null);
-  const [packetFilter, setPacketFilter] = useState<"all" | "sdp" | "ice">("all");
 
   // CallChip Live Action Timer State
   const [callChipLabel, setCallChipLabel] = useState("ready_for_handshake");
@@ -626,6 +624,67 @@ a=setup:actpass`;
     });
   };
 
+  // Step 6 State
+  const [step6Tab, setStep6Tab] = useState<"chat" | "sctp" | "stats">("chat");
+
+  // Step 5: Stop media tracks & release hardware permissions
+  const handleStopMedia = () => {
+    if (syntheticMediaStopRef.current) {
+      syntheticMediaStopRef.current();
+      syntheticMediaStopRef.current = null;
+    }
+    if (localMediaStream) {
+      localMediaStream.getTracks().forEach((t) => {
+        t.stop();
+      });
+      useLabStore.getState().setLocalMediaStream(null);
+    }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    setMediaStatus("idle");
+    setIsMicMuted(false);
+    setIsVideoMuted(false);
+    setCallChipLabel("media_tracks_ended_permissions_released");
+    setCallChipState("success");
+    setCallChipDuration(500);
+
+    setLastReaction({
+      title: "Media Hardware Released (Permissions Closed)",
+      detail: "track.stop() invoked: Camera LED indicator turned off. MediaStreamTracks permanently ended. Hardware access released.",
+      badge: "MEDIA STOPPED",
+      timestamp: new Date().toLocaleTimeString(),
+    });
+  };
+
+  // Step 6: End call & close RTCPeerConnection
+  const handleEndCall = () => {
+    if (syntheticMediaStopRef.current) {
+      syntheticMediaStopRef.current();
+      syntheticMediaStopRef.current = null;
+    }
+    loopbackService.reset();
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    setMediaStatus("idle");
+    setIsMicMuted(false);
+    setIsVideoMuted(false);
+    setCallChipLabel("peerconnection_closed_call_ended");
+    setCallChipState("success");
+    setCallChipDuration(600);
+
+    setLastReaction({
+      title: "Call Terminated (RTCPeerConnection Closed)",
+      detail: "pc.close() executed: SCTP DataChannel closed, DTLS-SRTP session destroyed, hardware media tracks stopped, and all ICE pinholes released.",
+      badge: "CALL ENDED",
+      timestamp: new Date().toLocaleTimeString(),
+    });
+  };
+
   // Video Refs for Step 5
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -782,29 +841,6 @@ a=setup:actpass`;
     }, 700);
   };
 
-  // Handle Stepping Next Message through Mailbox
-  const handleStepMessage = async () => {
-    if (mailbox.length === 0) return;
-    const nextMsg = mailbox[0];
-
-    setCallChipLabel(`delivering_${nextMsg.type}_to_peer_${nextMsg.to}`);
-    setCallChipState("running");
-
-    setLastReaction({
-      title: `Forwarding ${nextMsg.type.toUpperCase()} to Peer ${nextMsg.to}`,
-      detail: `Mailbox transferred item '${nextMsg.summary}'. Recipient will parse and invoke setRemoteDescription or addIceCandidate.`,
-      badge: nextMsg.type.toUpperCase(),
-      timestamp: new Date().toLocaleTimeString(),
-    });
-
-    setTimeout(async () => {
-      await loopbackService.stepNext();
-      setCallChipLabel(`${nextMsg.type}_delivered_to_peer_${nextMsg.to}`);
-      setCallChipState("success");
-      setCallChipDuration(650);
-    }, 600);
-  };
-
   const handleSendA = () => {
     if (!messageInputA.trim()) return;
     loopbackService.sendMessage("A", messageInputA.trim());
@@ -920,122 +956,6 @@ a=setup:actpass`;
     { id: 5, label: "Media SRTP" },
     { id: 6, label: "Data Channel" },
   ];
-
-  // Step curriculum definitions
-  const stepConfigs = [
-    {
-      title: "The Matchmaker (Signaling)",
-      question: "If WebRTC is peer-to-peer, why do we need a server at all to get started?",
-      analogy: "You can have a private phone call with anyone in the world, but you first need a mutual friend to give you each other's phone number.",
-      whatHappened: "Peer A and Peer B can't connect directly until they know how to address each other. The signaling server is simply a messenger that passes their initial contact notes.",
-    },
-    {
-      title: "The Business Card (SDP Offer / Answer)",
-      question: "How do two browsers agree on video quality and audio formats before sending media?",
-      analogy: "Before starting a business deal, two people exchange business cards detailing what languages they speak and what contracts they accept.",
-      whatHappened: "Peer A listed its supported video formats and media channels in an SDP text document. Peer B reviewed it, matched compatible formats, and sent back its agreement (the Answer).",
-    },
-    {
-      title: "Finding the Path (ICE Candidates)",
-      question: "How do browsers find the actual network route to reach each other through home Wi-Fi and mobile networks?",
-      analogy: "Imagine writing down every possible address where someone might reach you: your home Wi-Fi address, your public street address, and an office mailbox.",
-      whatHappened: "Candidates are gathered after setLocalDescription, and only for a media section or data channel in the offer. This lab adds a data channel before creating the offer so there is something to connect.",
-    },
-    {
-      title: "The Apartment Front Desk (NAT Basics)",
-      question: "Why can't someone on the public internet connect directly to your laptop's Wi-Fi IP address?",
-      analogy: "Your apartment building has one street address, but individual apartment numbers are secret from outside delivery drivers until the front desk logs your outgoing request.",
-      whatHappened: "Network Address Translation (NAT) maps many private home IPs to a single public IP. When Peer A sends an outbound packet, the router creates a temporary pinhole that lets Peer B reply.",
-    },
-    {
-      title: "Hooking up the Cameras (Media Streams & Tracks)",
-      question: "How does raw webcam video get compressed, packetized, and encrypted into the peer connection?",
-      analogy: "A camera feed is like an uncompressed water hose. WebRTC puts it through a tight nozzle (codec), stamps every droplet with a timestamp (RTP), and locks it in an armored pipe (SRTP).",
-      whatHappened: "getUserMedia captures raw camera frames, the browser encodes them into VP8 or H.264 video packets, and encrypts them using SRTP keys negotiated during the DTLS handshake.",
-    },
-    {
-      title: "The Direct Wire (Data Channels)",
-      question: "Can we transfer arbitrary data like chat, gaming states, or files directly between browsers?",
-      analogy: "Alongside the audio and video pipe, WebRTC lays a direct fiber-optic cable for binary and text messages with zero server in between.",
-      whatHappened: "RTCDataChannel uses the SCTP protocol running over DTLS. It provides high-throughput, low-latency, encrypted messaging with configurable reliability and ordering.",
-    },
-  ];
-
-  const currentConfig = stepConfigs[currentStep - 1];
-
-  // Derive consolidated list of all transmitted & in-flight packets for X-Ray Inspector
-  interface PacketRecord {
-    id: string;
-    from: "A" | "B";
-    to: "A" | "B";
-    type: "offer" | "answer" | "candidate";
-    summary: string;
-    candidate?: CandidateInfo;
-    sdpSnippet?: string;
-    isInFlight?: boolean;
-  }
-
-  const allPackets: PacketRecord[] = [];
-
-  // Add currently queued mailbox items
-  mailbox.forEach((msg) => {
-    allPackets.push({
-      id: `mb-${msg.id}`,
-      from: msg.from,
-      to: msg.to,
-      type: msg.type,
-      summary: msg.summary,
-      isInFlight: true,
-    });
-  });
-
-  // Add SDP offer
-  if (sdpOffer) {
-    allPackets.push({
-      id: "sdp-offer",
-      from: "A",
-      to: "B",
-      type: "offer",
-      summary: "SDP Offer (VP8, H264, SCTP data-channel)",
-      sdpSnippet: sdpOffer.slice(0, 320) + "...",
-    });
-  }
-
-  // Add SDP answer
-  if (sdpAnswer) {
-    allPackets.push({
-      id: "sdp-answer",
-      from: "B",
-      to: "A",
-      type: "answer",
-      summary: "SDP Answer (Codecs Accepted, DTLS Fingerprint)",
-      sdpSnippet: sdpAnswer.slice(0, 320) + "...",
-    });
-  }
-
-  // Add gathered candidates
-  gatheredCandidates.forEach((c) => {
-    allPackets.push({
-      id: `cand-${c.id}`,
-      from: c.peer,
-      to: c.peer === "A" ? "B" : "A",
-      type: "candidate",
-      summary: `ICE Candidate: [${c.type}] ${c.address}:${c.port} (${c.protocol.toUpperCase()})`,
-      candidate: c,
-    });
-  });
-
-  // Filtered packets
-  const filteredPackets = allPackets.filter((p) => {
-    if (packetFilter === "sdp") return p.type === "offer" || p.type === "answer";
-    if (packetFilter === "ice") return p.type === "candidate";
-    return true;
-  });
-
-  const activePacket =
-    selectedPacketIndex !== null && filteredPackets[selectedPacketIndex]
-      ? filteredPackets[selectedPacketIndex]
-      : filteredPackets[0] || null;
 
   return (
     <div className="min-h-screen lg:h-screen w-screen bg-[#000000] text-[#ededed] font-sans selection:bg-[#262626] selection:text-[#ededed] p-2.5 sm:p-3 flex flex-col overflow-y-auto lg:overflow-hidden gap-2">
@@ -3185,6 +3105,18 @@ a=setup:actpass`;
                       <span>{selectedResolution.toUpperCase()}</span>
                     </button>
                   </div>
+
+                  {mediaStatus !== "idle" && (
+                    <button
+                      type="button"
+                      onClick={handleStopMedia}
+                      className="w-full h-8 rounded-[6px] border border-red-500/40 bg-red-950/20 text-xs font-mono text-red-300 hover:border-red-500/60 hover:bg-red-950/40 transition-all flex items-center justify-center gap-1.5"
+                      title="Turn off camera and mic hardware, releasing browser device permissions"
+                    >
+                      <PhoneOff className="h-3.5 w-3.5 text-red-400" />
+                      <span>Release Hardware / Stop Tracks (track.stop)</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Action Reaction Feed */}
@@ -3663,559 +3595,521 @@ const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
           </motion.div>
         ) : (
           /* ============================================================== */
-          /* STEP 6: THE DIRECT WIRE (DATA CHANNELS & LIVE PEER CALL) ARENA */
+          /* STEP 6: THE DIRECT WIRE (DATA CHANNELS & LIVE P2P CALL) BENTO  */
           /* ============================================================== */
           <motion.div
-            key="steps-5-6-bento"
+            key="step-6-direct-wire-bento"
             layout
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
-            className="flex-1 min-h-0 w-full grid grid-cols-12 grid-rows-12 gap-2.5"
+            className="flex-1 min-h-0 w-full grid grid-cols-12 grid-rows-1 gap-2.5"
           >
-            {/* CARD 1: PEER A - CALLER STUDIO (Left Flank) */}
-            <div className="col-span-12 lg:col-span-3 row-span-12 rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Laptop className="h-4 w-4 text-[#a1a1a1]" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#ededed]">Peer A (Caller)</span>
+            {/* LEFT COLUMN: GUIDANCE, DIRECTIVES, QUICK CHAT & CALL CONTROLS (Col 4) */}
+            <div className="col-span-12 lg:col-span-4 h-full min-h-0 flex flex-col justify-between overflow-hidden rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3.5 shadow-sm">
+              <div className="space-y-2 overflow-y-auto pr-1">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono tracking-wider uppercase text-purple-300 font-semibold">
+                      Step 6 of 6 • Curriculum
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      RFC 8831 • SCTP over DTLS
+                    </span>
                   </div>
                   <span
-                    data-testid="peer-a-state"
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-mono font-medium border ${
-                      peerAConnectionState === "connected"
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                        : "bg-[#141414] text-[#a1a1a1] border-[#262626]"
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-[4px] border ${
+                      peerAConnectionState === "connected" && peerBConnectionState === "connected"
+                        ? "border-emerald-500/40 bg-emerald-950/30 text-emerald-400 font-bold"
+                        : "border-[#262626] bg-[#141414] text-[#777777]"
                     }`}
                   >
-                    {peerAConnectionState}
+                    {peerAConnectionState === "connected" && peerBConnectionState === "connected" ? "Direct P2P Active" : "Negotiating"}
                   </span>
                 </div>
 
-                <div className="relative aspect-video w-full overflow-hidden rounded-[6px] border border-[#242424] bg-[#000000] flex items-center justify-center">
-                  {localMediaStream ? (
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center gap-1.5 text-center p-3">
-                      <Video className="h-6 w-6 text-[#404040]" />
-                      <span className="text-[11px] font-mono text-[#666666]">Local Stream Inactive</span>
-                      <span className="text-[10px] text-[#555555]">Step 5 attaches live or synthetic canvas feed</span>
-                    </div>
-                  )}
-                  {mediaStatus !== "idle" && (
-                    <span className="absolute top-1.5 right-1.5 rounded-[4px] bg-black/70 px-1.5 py-0.5 text-[9px] font-mono text-emerald-400 border border-emerald-500/30">
-                      {mediaStatus === "live" ? "HD Camera" : "Synthetic 30fps"}
-                    </span>
-                  )}
-                </div>
-
-                <div className="rounded-[6px] border border-[#1e1e1e] bg-[#121212]/60 p-2.5 space-y-1.5 text-xs font-mono">
-                  <div className="flex justify-between text-[#888888]">
-                    <span>Role:</span>
-                    <span className="text-[#ededed]">Offerer (Initiator)</span>
-                  </div>
-                  <div className="flex justify-between text-[#888888]">
-                    <span>DataChannel:</span>
-                    <span className="text-[#ededed]">lab-channel (sctp:0)</span>
-                  </div>
-                  <div className="flex justify-between text-[#888888]">
-                    <span>Local Offer:</span>
-                    <span className="text-[#ededed]">{sdpOffer ? "42 lines (VP8/H264)" : "Pending"}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono uppercase text-[#777777]">Gathered Candidates ({gatheredCandidates.filter(c => c.peer === 'A').length})</span>
-                    <span className="text-[10px] font-mono text-[#555555]">RFC 8445</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
-                    {gatheredCandidates.filter(c => c.peer === 'A').length === 0 ? (
-                      <span className="text-[11px] font-mono text-[#555555] italic">No local candidates gathered yet</span>
-                    ) : (
-                      gatheredCandidates.filter(c => c.peer === 'A').map((c) => (
-                        <span
-                          key={c.id}
-                          className={`inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[10px] font-mono border ${
-                            c.type === "host"
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                              : c.type === "srflx"
-                              ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-                              : "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                          }`}
-                        >
-                          <span>{c.type}</span>
-                          <span className="text-[#888888]">{c.port}</span>
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-[#1e1e1e] space-y-1.5">
-                <span className="text-[11px] font-mono text-[#888888] block">Send to Peer B</span>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="Message to B..."
-                    value={messageInputA}
-                    onChange={(e) => setMessageInputA(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSendA()}
-                    data-testid="input-msg-a"
-                    className="h-7 flex-1 rounded-[4px] border border-[#242424] bg-[#050505] px-2 text-xs font-mono text-[#ededed] placeholder:text-[#555555] focus:border-[#404040] outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendA}
-                    data-testid="btn-send-a"
-                    className="inline-flex h-7 items-center justify-center rounded-[4px] border border-[#242424] bg-[#141414] px-2.5 text-xs text-[#ededed] hover:border-[#404040] transition-colors"
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* CENTER COLUMN: CONCEPT + THE WIRE + PACKET X-RAY INSPECTOR */}
-            <div className="col-span-12 lg:col-span-6 row-span-12 flex flex-col gap-2.5 h-full min-h-0">
-              {/* CARD 2: CONCEPT & ACTION DECK */}
-              <div className="h-[43%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3.5 flex flex-col justify-between overflow-hidden shadow-sm">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono tracking-wider uppercase text-[#a1a1a1]">
-                      Step {currentStep} of 6 • Curriculum
-                    </span>
-                    <span className="text-[11px] font-mono text-[#666666]">
-                      {currentStep === 2 && "RFC 8829 • JSEP"}
-                      {currentStep === 3 && "RFC 8445 • ICE"}
-                      {currentStep === 4 && "STUN & Firewall"}
-                      {currentStep === 5 && "DTLS-SRTP Codecs"}
-                      {currentStep === 6 && "SCTP Data Pipe"}
-                    </span>
-                  </div>
-
-                  <h2 className="text-lg font-semibold tracking-tight text-[#ededed]">
-                    {currentConfig.title}
+                <div>
+                  <h2 className="text-base sm:text-lg font-semibold tracking-tight text-[#ededed]">
+                    The Direct Wire (Data Channels)
                   </h2>
-
-                  <p className="text-xs text-[#a1a1a1] leading-relaxed">
-                    <strong className="text-[#ededed]">Mental Model & Analogy:</strong> {currentConfig.analogy}
+                  <p className="text-xs text-[#888888]">
+                    Bidirectional arbitrary data packets & real-time video streaming with zero server relay.
                   </p>
                 </div>
 
-                {/* Step Dynamic Triggers */}
-                <div className="py-2">
-                  {currentStep === 2 && (
-                    <SpecularButton
-                      onClick={handleStartHandshake}
-                      data-testid="btn-start-offer"
-                      className="w-full h-8 text-xs font-semibold"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      <span>Generate SDP Business Card & Open Channels</span>
-                    </SpecularButton>
-                  )}
-
-                  {currentStep === 3 && (
-                    <div className="flex gap-2">
-                      <SpecularButton
-                        onClick={handleStartHandshake}
-                        data-testid="btn-start-offer"
-                        className="flex-1 h-8 text-xs font-semibold"
-                      >
-                        <Network className="h-3.5 w-3.5" />
-                        <span>Gather All Candidate Routes</span>
-                      </SpecularButton>
-                      <button
-                        type="button"
-                        onClick={handleStepMessage}
-                        disabled={mailbox.length === 0}
-                        className="h-8 px-3 rounded-[6px] border border-[#242424] bg-[#121212] text-xs font-mono text-[#ededed] hover:border-[#404040] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                      >
-                        Step Next ({mailbox.length})
-                      </button>
-                    </div>
-                  )}
-
-                  {currentStep === 4 && (
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-mono text-[#666666] block">[ILLUSTRATION: Educational Animation]</span>
-                      <SpecularButton
-                        onClick={handleTriggerNatSimulation}
-                        className="w-full h-8 text-xs font-semibold"
-                      >
-                        <Radio className="h-3.5 w-3.5" />
-                        <span>Send Outbound Packet through NAT</span>
-                      </SpecularButton>
-                    </div>
-                  )}
-
-                  {currentStep === 5 && (
-                    <SpecularButton
-                      onClick={handleRequestMedia}
-                      className="w-full h-8 text-xs font-semibold"
-                    >
-                      <Video className="h-3.5 w-3.5" />
-                      <span>Request Camera / Synthetic Feed</span>
-                    </SpecularButton>
-                  )}
-
-                  {currentStep === 6 && (
-                    <div className="flex gap-2">
-                      <SpecularButton
-                        onClick={handleStartHandshake}
-                        data-testid="btn-start-offer"
-                        className="flex-1 h-8 text-xs font-semibold"
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        <span>Establish Direct SCTP Data Wire</span>
-                      </SpecularButton>
-                    </div>
-                  )}
+                {/* 2-line "Why Are We Doing This?" Card */}
+                <div className="rounded-[6px] border border-purple-500/30 bg-purple-950/20 p-2.5 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-200">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                    <span>Why Are We Doing This?</span>
+                  </div>
+                  <p className="text-xs text-purple-200/90 leading-relaxed font-mono">
+                    Signaling and NAT hole-punching are complete. Now Peer A and Peer B exchange encrypted binary data and video directly between their network sockets over DTLS-SRTP and SCTP with zero server latency or eavesdropping.
+                  </p>
                 </div>
 
-                <div className="rounded-[6px] border border-[#262626] bg-[#111111]/80 p-2.5 space-y-1">
+                {/* Mental Model & Analogy */}
+                <div className="rounded-[6px] border border-[#222222] bg-[#121212] p-2.5 space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Mental Model & Analogy</span>
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                    <strong className="text-[#ededed]">The Private Transatlantic Cable: </strong>
+                    The matchmaker introduced you, the contracts were exchanged, and the front-desk pinholes are punched. You now hold a direct private wire. Even if the signaling server crashes right now, this call and data channel will stay active!
+                  </p>
+                </div>
+
+                {/* Key Protocol Fact */}
+                <div className="rounded-[6px] border border-[#222222] bg-[#121212] p-2.5 space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                    <Key className="h-3.5 w-3.5 text-purple-400" />
+                    <span>Key Protocol Fact: SCTP Reliability & Ordering</span>
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                    Unlike WebSockets (TCP only), WebRTC Data Channels let developers configure message reliability: reliable/ordered (like TCP file transfers) or unreliable/unordered (like UDP game state or sensor updates).
+                  </p>
+                </div>
+              </div>
+
+              {/* Lower Section: Interactive Directives & Reaction */}
+              <div className="pt-2 space-y-2 border-t border-[#1e1e1e]">
+                {/* Primary Action Button */}
+                <SpecularButton
+                  onClick={handleStartHandshake}
+                  data-testid="btn-start-offer"
+                  className="w-full h-8 text-xs font-semibold shadow-sm"
+                >
+                  <Zap className="h-3.5 w-3.5 mr-1 text-purple-400" />
+                  <span>Establish Direct SCTP Data Wire</span>
+                </SpecularButton>
+
+                {/* Peer A Quick Send Bar */}
+                <div className="space-y-1">
+                  <span className="text-[11px] font-mono text-[#888888] flex items-center justify-between">
+                    <span>Peer A (Caller) ➔ Send to B:</span>
+                    <span className="text-[10px] text-emerald-400">sctp:0</span>
+                  </span>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Message to Peer B..."
+                      value={messageInputA}
+                      onChange={(e) => setMessageInputA(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSendA()}
+                      data-testid="input-msg-a"
+                      className="h-7 flex-1 rounded-[4px] border border-[#242424] bg-[#050505] px-2 text-xs font-mono text-[#ededed] placeholder:text-[#555555] focus:border-purple-500/50 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendA}
+                      data-testid="btn-send-a"
+                      className="inline-flex h-7 items-center justify-center rounded-[4px] border border-purple-500/40 bg-purple-950/30 px-2.5 text-xs font-mono text-purple-300 hover:border-purple-500/70 transition-colors"
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      <span>Send</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* End Call / Hardware Release Button */}
+                <button
+                  type="button"
+                  onClick={handleEndCall}
+                  className="w-full h-7 rounded-[4px] border border-red-500/40 bg-red-950/20 text-xs font-mono text-red-300 hover:border-red-500/60 hover:bg-red-950/40 transition-all flex items-center justify-center gap-1.5"
+                  title="Close RTCPeerConnection and stop all hardware media tracks"
+                >
+                  <PhoneOff className="h-3.5 w-3.5 text-red-400" />
+                  <span>End Call / Close PeerConnection</span>
+                </button>
+
+                {/* Action Reaction Feed */}
+                <div className="rounded-[8px] border border-[#262626] bg-[#111111] p-2 space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="text-[11px] font-semibold tracking-wide text-[#ededed]">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span className="text-xs font-semibold text-[#ededed] truncate">
                         {lastReaction.title}
                       </span>
                     </div>
                     {lastReaction.badge && (
-                      <span className="rounded-[3px] bg-[#1f1f1f] px-1.5 py-0.2 text-[9px] font-mono text-[#a1a1a1]">
+                      <span className="rounded bg-[#1c1c1c] px-2 py-0.5 text-xs font-mono text-purple-300 border border-[#2c2c2c]">
                         {lastReaction.badge}
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#a1a1a1] leading-normal font-mono">
+                  <p className="text-xs text-[#a1a1a1] font-mono leading-relaxed truncate">
                     {lastReaction.detail}
                   </p>
                 </div>
               </div>
-
-              {/* CARD 3: THE LIVE WIRE & BUFFER STACK */}
-              <div className="h-[25%] rounded-[8px] border border-[#242424] bg-[#0d0d0d] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-3.5 w-3.5 text-cyan-400" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#ededed]">Signaling Highway</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-mono">
-                    <span className="text-[#888888]">Buffer Queue:</span>
-                    <span className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-semibold border ${
-                      mailbox.length > 0 ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-[#141414] text-[#666666] border-[#222222]"
-                    }`}>
-                      {mailbox.length} in flight
-                    </span>
-                    {mailbox.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleStepMessage}
-                        className="ml-1 px-2 py-0.5 rounded-[4px] border border-[#333333] bg-[#1a1a1a] text-[10px] text-[#ededed] hover:border-[#555555] transition-all"
-                      >
-                        Deliver Next ➔
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="relative my-auto flex items-center justify-between px-6 py-2">
-                  <div className="flex flex-col items-center gap-1 z-10">
-                    <span className="h-3 w-3 rounded-full bg-emerald-500 border-2 border-black ring-1 ring-emerald-500/50" />
-                    <span className="text-[10px] font-mono text-[#888888]">Peer A</span>
-                  </div>
-
-                  <div className="absolute inset-x-12 top-1/2 -translate-y-1/2 h-[2px] bg-[#222222]">
-                    <motion.div
-                      className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] -translate-y-1/2 top-1/2 absolute"
-                      animate={{ left: ["5%", "95%"] }}
-                      transition={{ duration: isPaused ? 0 : 2.4, repeat: isPaused ? 0 : Infinity, ease: "linear" }}
-                    />
-                  </div>
-
-                  <div className="flex flex-col items-center gap-1 z-10 bg-[#0d0d0d] px-2">
-                    <div className={`flex items-center gap-1 rounded-[6px] border px-2 py-1 text-[10px] font-mono ${
-                      mailbox.length > 0 ? "border-amber-500/40 bg-amber-950/20 text-amber-300" : "border-[#262626] bg-[#141414] text-[#777777]"
-                    }`}>
-                      <Server className="h-3 w-3" />
-                      <span>{mailbox.length > 0 ? `${mailbox.length} Queued` : "Mailbox Clear"}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center gap-1 z-10">
-                    <span className="h-3 w-3 rounded-full bg-cyan-500 border-2 border-black ring-1 ring-cyan-500/50" />
-                    <span className="text-[10px] font-mono text-[#888888]">Peer B</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 overflow-x-auto text-[10px] font-mono text-[#777777]">
-                  <span>Next up:</span>
-                  {mailbox.length === 0 ? (
-                    <span className="italic text-[#444444]">No pending signaling messages</span>
-                  ) : (
-                    mailbox.slice(0, 3).map((m) => (
-                      <span
-                        key={m.id}
-                        className="inline-flex items-center gap-1 rounded-[4px] border border-[#2a2a2a] bg-[#141414] px-1.5 py-0.5 text-[#ededed]"
-                      >
-                        <span>{m.from}➔{m.to}</span>
-                        <span className="text-amber-400 font-semibold">{m.type}</span>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* CARD 4: PACKET X-RAY & PAYLOAD INSPECTOR */}
-              <div className="h-[32%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
-                  <div className="flex items-center gap-2">
-                    <Layers className="h-3.5 w-3.5 text-purple-400" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#ededed]">Packet X-Ray & Gathered Candidates</span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    {(["all", "sdp", "ice"] as const).map((filter) => (
-                      <button
-                        key={filter}
-                        type="button"
-                        onClick={() => {
-                          setPacketFilter(filter);
-                          setSelectedPacketIndex(0);
-                        }}
-                        className={`rounded-[4px] px-2 py-0.5 text-[10px] font-mono uppercase transition-colors ${
-                          packetFilter === filter
-                            ? "bg-[#222222] text-[#ededed] font-semibold"
-                            : "text-[#666666] hover:text-[#ededed]"
-                        }`}
-                      >
-                        {filter}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex-1 min-h-0 grid grid-cols-12 gap-2 pt-2">
-                  <div className="col-span-5 h-full overflow-y-auto space-y-1 pr-1 border-r border-[#1a1a1a]">
-                    {filteredPackets.length === 0 ? (
-                      <div className="h-full flex items-center justify-center text-[10px] font-mono text-[#444444] italic">
-                        No packets recorded
-                      </div>
-                    ) : (
-                      filteredPackets.map((pkt, idx) => (
-                        <button
-                          key={pkt.id}
-                          type="button"
-                          onClick={() => setSelectedPacketIndex(idx)}
-                          className={`w-full text-left rounded-[4px] p-1.5 border text-[10px] font-mono transition-all flex items-center justify-between ${
-                            (selectedPacketIndex === idx || (selectedPacketIndex === null && idx === 0))
-                              ? "border-cyan-500/50 bg-[#141414] text-[#ededed]"
-                              : "border-[#1e1e1e] bg-[#0a0a0a] text-[#888888] hover:border-[#333333]"
-                          }`}
-                        >
-                          <div className="flex items-center gap-1 truncate">
-                            <span className="text-[#555555]">{pkt.from}➔{pkt.to}</span>
-                            <span className={`font-semibold ${
-                              pkt.type === "offer" ? "text-purple-400" : pkt.type === "answer" ? "text-cyan-400" : "text-emerald-400"
-                            }`}>
-                              {pkt.type}
-                            </span>
-                          </div>
-                          {pkt.candidate && (
-                            <span className="text-[9px] text-[#666666] uppercase">{pkt.candidate.type}</span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="col-span-7 h-full overflow-y-auto rounded-[6px] border border-[#1e1e1e] bg-[#0d0d0d] p-2 text-[10px] font-mono text-[#a1a1a1] space-y-1">
-                    {activePacket ? (
-                      <>
-                        <div className="flex items-center justify-between border-b border-[#1a1a1a] pb-1 text-[#ededed]">
-                          <span className="font-semibold uppercase tracking-wider">{activePacket.summary}</span>
-                          <span className="rounded bg-[#1a1a1a] px-1 py-0.2 text-[9px] text-cyan-300">
-                            {activePacket.from} ➔ {activePacket.to}
-                          </span>
-                        </div>
-
-                        {activePacket.candidate && (
-                          <div className="space-y-1 pt-1 text-[10px]">
-                            <div className="flex justify-between">
-                              <span className="text-[#666666]">Candidate Type:</span>
-                              <span className="font-semibold text-emerald-400 uppercase">{activePacket.candidate.type}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#666666]">Socket:</span>
-                              <span className="text-[#ededed]">{activePacket.candidate.address}:{activePacket.candidate.port}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#666666]">Transport:</span>
-                              <span className="text-[#ededed]">{activePacket.candidate.protocol.toUpperCase()}</span>
-                            </div>
-                            <p className="text-[9px] text-[#777777] pt-1 leading-normal border-t border-[#1a1a1a]">
-                              {activePacket.candidate.type === "host" && "Direct LAN interface (Local Wi-Fi). Fastest path between peers on same subnet."}
-                              {activePacket.candidate.type === "srflx" && "Server Reflexive (STUN). Public IP discovered outside the local NAT firewall."}
-                              {activePacket.candidate.type === "relay" && "TURN Relay. Tunnel used when direct peer-to-peer connection is blocked by firewall."}
-                            </p>
-                          </div>
-                        )}
-
-                        {activePacket.sdpSnippet && (
-                          <div className="pt-1">
-                            <span className="text-[#666666] block mb-1">SDP Body Preview:</span>
-                            <pre className="text-[9px] leading-tight text-[#888888] whitespace-pre-wrap font-mono max-h-16 overflow-y-auto bg-black p-1.5 rounded border border-[#1a1a1a]">
-                              {activePacket.sdpSnippet}
-                            </pre>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-[#555555] italic">
-                        Trigger an offer or gather candidates to inspect decoded payloads
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* CARD 5 & 6: PEER B MONITOR & DATACHANNEL PIPE (Right Flank) */}
-            <div className="col-span-12 lg:col-span-3 row-span-12 flex flex-col gap-2.5 h-full min-h-0">
-              {/* CARD 5: PEER B */}
-              <div className="h-[50%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <Server className="h-4 w-4 text-[#a1a1a1]" />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-[#ededed]">Peer B (Callee)</span>
-                    </div>
-                    <span
-                      data-testid="peer-b-state"
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-mono font-medium border ${
-                        peerBConnectionState === "connected"
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                          : "bg-[#141414] text-[#a1a1a1] border-[#262626]"
-                      }`}
-                    >
-                      {peerBConnectionState}
+            {/* RIGHT COLUMN: DUAL-PEER STUDIO & DATACHANNEL TERMINAL (Col 8) */}
+            <div className="col-span-12 lg:col-span-8 h-full min-h-0 flex flex-col gap-2.5">
+              {/* TOP: DUAL-PEER LIVE CALL STUDIO (Height ~48%) */}
+              <div className="h-[48%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Radio className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed]">
+                      Direct P2P Encrypted Studio
                     </span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      DTLS 1.3 • AES_128_GCM
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-cyan-500/30 bg-cyan-950/20 text-cyan-300">
+                      SCTP Association Open
+                    </span>
+                  </div>
+                </div>
 
-                  <div className="relative aspect-video w-full overflow-hidden rounded-[6px] border border-[#242424] bg-[#000000] flex items-center justify-center">
-                    {remoteMediaStream ? (
-                      <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center gap-1.5 text-center p-3">
-                        <Video className="h-5 w-5 text-[#404040]" />
-                        <span className="text-[11px] font-mono text-[#666666]">Inbound Feed Inactive</span>
+                {/* Dual Monitors Highway with Direct Tunnel in Middle */}
+                <div className="relative my-auto grid grid-cols-12 gap-3 items-center">
+                  {/* Peer A Box */}
+                  <div className="col-span-5 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Laptop className="h-3.5 w-3.5 text-emerald-400" />
+                        <span className="text-xs font-semibold text-[#ededed]">Peer A (Caller)</span>
                       </div>
-                    )}
-                    {remoteMediaStream && (
-                      <span className="absolute top-1.5 right-1.5 rounded-[4px] bg-black/70 px-1.5 py-0.5 text-[9px] font-mono text-cyan-400 border border-cyan-500/30">
-                        Live Decoded
+                      <span
+                        data-testid="peer-a-state"
+                        className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                          peerAConnectionState === "connected"
+                            ? "border-emerald-500/40 bg-emerald-950/30 text-emerald-400 font-bold"
+                            : "border-[#262626] bg-[#141414] text-[#888888]"
+                        }`}
+                      >
+                        {peerAConnectionState}
                       </span>
-                    )}
+                    </div>
+
+                    <div className="relative aspect-video w-full overflow-hidden rounded-[6px] border border-[#242424] bg-black flex items-center justify-center">
+                      {localMediaStream ? (
+                        <video
+                          ref={localVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className={`h-full w-full object-cover ${isVideoMuted ? "opacity-15 filter grayscale" : ""}`}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-1 text-center p-2">
+                          <Video className="h-5 w-5 text-[#404040]" />
+                          <span className="text-[10px] font-mono text-[#666666]">Local Stream Idle</span>
+                        </div>
+                      )}
+                      <span className="absolute bottom-1 left-1.5 text-[9px] font-mono text-[#888888] bg-black/60 px-1 rounded">
+                        192.168.1.15:54321
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="rounded-[6px] border border-[#1e1e1e] bg-[#121212]/60 p-2 space-y-1 text-xs font-mono">
-                    <div className="flex justify-between text-[#888888]">
-                      <span>Role:</span>
-                      <span className="text-[#ededed]">Answerer</span>
+                  {/* Middle: The Direct Wire Tunnel */}
+                  <div className="col-span-2 flex flex-col items-center justify-center gap-1.5 py-2">
+                    <div className="w-full relative h-[3px] bg-[#222222]">
+                      <motion.div
+                        className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,1)] absolute -top-[2.5px]"
+                        animate={{ left: ["0%", "100%", "0%"] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                      />
                     </div>
-                    <div className="flex justify-between text-[#888888]">
-                      <span>Answer:</span>
-                      <span className="text-[#ededed]">{sdpAnswer ? "Accepted (VP8)" : "Awaiting Offer"}</span>
+                    <div className="flex flex-col items-center text-center">
+                      <Lock className="h-3.5 w-3.5 text-purple-400" />
+                      <span className="text-[9px] font-mono text-purple-300 font-bold whitespace-nowrap">Direct Pipe</span>
+                      <span className="text-[8px] font-mono text-[#666666] whitespace-nowrap">&lt; 2ms RTT</span>
                     </div>
-                    <div className="flex justify-between text-[#888888]">
-                      <span>Security:</span>
-                      <span className="text-[#ededed]">DTLS-SRTP AES_128</span>
+                  </div>
+
+                  {/* Peer B Box */}
+                  <div className="col-span-5 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Server className="h-3.5 w-3.5 text-cyan-400" />
+                        <span className="text-xs font-semibold text-[#ededed]">Peer B (Callee)</span>
+                      </div>
+                      <span
+                        data-testid="peer-b-state"
+                        className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                          peerBConnectionState === "connected"
+                            ? "border-emerald-500/40 bg-emerald-950/30 text-emerald-400 font-bold"
+                            : "border-[#262626] bg-[#141414] text-[#888888]"
+                        }`}
+                      >
+                        {peerBConnectionState}
+                      </span>
+                    </div>
+
+                    <div className="relative aspect-video w-full overflow-hidden rounded-[6px] border border-[#242424] bg-black flex items-center justify-center">
+                      {remoteMediaStream ? (
+                        <video
+                          ref={remoteVideoRef}
+                          autoPlay
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-1 text-center p-2">
+                          <Video className="h-5 w-5 text-[#404040]" />
+                          <span className="text-[10px] font-mono text-[#666666]">Remote Stream Idle</span>
+                        </div>
+                      )}
+                      <span className="absolute bottom-1 left-1.5 text-[9px] font-mono text-[#888888] bg-black/60 px-1 rounded">
+                        103.21.44.12:49152
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-1.5 border-t border-[#1e1e1e] flex items-center justify-between text-[11px] font-mono text-[#777777]">
-                  <span>Inbound Candidates:</span>
-                  <span className="text-[#ededed] font-semibold">{gatheredCandidates.filter(c => c.peer === 'B').length} gathered</span>
+                {/* Status Chips Row */}
+                <div className="grid grid-cols-4 gap-2 pt-1 border-t border-[#1e1e1e]">
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Zap className="h-3 w-3 text-emerald-400" />
+                      <span>Wire State</span>
+                    </div>
+                    <div className={`text-xs font-bold font-mono truncate ${
+                      peerAConnectionState === "connected" ? "text-emerald-400" : "text-[#777777]"
+                    }`}>
+                      {peerAConnectionState === "connected" ? "Direct P2P Active" : "Standby"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <MessageSquare className="h-3 w-3 text-purple-400" />
+                      <span>DataChannel</span>
+                    </div>
+                    <div className="text-xs font-bold text-purple-300 font-mono truncate">
+                      lab-channel (sctp:0)
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Shield className="h-3 w-3 text-cyan-400" />
+                      <span>Cipher</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono truncate">
+                      DTLS / SRTP (AES)
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Clock className="h-3 w-3 text-amber-400" />
+                      <span>Loopback RTT</span>
+                    </div>
+                    <div className="text-xs font-bold text-amber-300 font-mono">
+                      &lt; 2 ms
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* CARD 6: LIVE DATACHANNEL PIPE */}
-              <div className="h-[50%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+              {/* BOTTOM: DATACHANNEL TERMINAL & STATS INSPECTOR (Height ~52%) */}
+              <div className="h-[52%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <MessageSquare className="h-3.5 w-3.5 text-cyan-400" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#ededed]">DataChannel Pipe</span>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
+                      <span>Live DataChannel Terminal & Stats Inspector</span>
+                    </span>
                   </div>
-                  <span className="rounded bg-[#141414] px-1.5 py-0.5 text-[10px] font-mono text-cyan-400 border border-[#242424]">
-                    SCTP over DTLS
-                  </span>
-                </div>
 
-                <div
-                  data-testid="dc-log"
-                  className="flex-1 min-h-0 my-2 overflow-y-auto rounded-[6px] border border-[#1e1e1e] bg-[#000000] p-2 space-y-1.5 text-xs font-mono"
-                >
-                  {dataChannelMessages.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-[11px] text-[#444444] italic">
-                      DataChannel idle. Send a message below.
-                    </div>
-                  ) : (
-                    dataChannelMessages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        className={`rounded-[4px] p-1.5 text-[11px] border leading-tight ${
-                          msg.from === "A"
-                            ? "border-emerald-500/20 bg-emerald-950/20 text-emerald-300 ml-4"
-                            : "border-cyan-500/20 bg-cyan-950/20 text-cyan-300 mr-4"
+                  {/* Mode Switcher Tabs */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center rounded-[6px] bg-[#141414] p-0.5 border border-[#222222]">
+                      <button
+                        type="button"
+                        onClick={() => setStep6Tab("chat")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step6Tab === "chat"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
                         }`}
                       >
-                        <div className="flex justify-between text-[9px] text-[#666666] mb-0.5">
-                          <span>Peer {msg.from}</span>
-                          <span>{new Date(msg.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                        <span>{msg.text}</span>
-                      </div>
-                    ))
-                  )}
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        <span>Chat Terminal</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep6Tab("sctp")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step6Tab === "sctp"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Layers className="h-3.5 w-3.5" />
+                        <span>SCTP Stack</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep6Tab("stats")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step6Tab === "stats"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Activity className="h-3.5 w-3.5" />
+                        <span>getStats()</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="pt-1.5 border-t border-[#1e1e1e] space-y-1.5">
-                  <span className="text-[11px] font-mono text-[#888888] block">Peer B Reply to Peer A</span>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="text"
-                      placeholder="Reply to Peer A..."
-                      value={messageInputB}
-                      onChange={(e) => setMessageInputB(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendB()}
-                      data-testid="input-msg-b"
-                      className="h-7 flex-1 rounded-[4px] border border-[#242424] bg-[#050505] px-2 text-xs font-mono text-[#ededed] placeholder:text-[#555555] focus:border-[#404040] outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSendB}
-                      data-testid="btn-send-b"
-                      className="inline-flex h-7 items-center justify-center rounded-[4px] border border-[#242424] bg-[#141414] px-2.5 text-xs text-[#ededed] hover:border-[#404040] transition-colors"
-                    >
-                      Send
-                    </button>
-                  </div>
+                {/* Tab Content Display */}
+                <div className="flex-1 min-h-0 pt-2 overflow-hidden">
+                  {/* TAB 1: CHAT TERMINAL */}
+                  {step6Tab === "chat" && (
+                    <div className="h-full flex flex-col justify-between">
+                      {/* Message Log */}
+                      <div
+                        data-testid="dc-log"
+                        className="flex-1 min-h-0 overflow-y-auto rounded-[6px] border border-[#1e1e1e] bg-black p-2 space-y-1.5 font-mono text-xs"
+                      >
+                        {dataChannelMessages.length === 0 ? (
+                          <div className="h-full flex items-center justify-center text-xs text-[#555555] italic">
+                            DataChannel idle. Click 'Establish Direct SCTP Data Wire' or send a message to begin.
+                          </div>
+                        ) : (
+                          dataChannelMessages.map((msg, idx) => (
+                            <div
+                              key={idx}
+                              className={`rounded-[6px] p-2 text-xs border max-w-[85%] ${
+                                msg.from === "A"
+                                  ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200 ml-auto"
+                                  : "border-cyan-500/30 bg-cyan-950/20 text-cyan-200 mr-auto"
+                              }`}
+                            >
+                              <div className="flex justify-between items-center text-[10px] text-[#777777] mb-1">
+                                <span className="font-semibold text-[#ededed]">Peer {msg.from}</span>
+                                <span>{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                              </div>
+                              <span className="leading-relaxed">{msg.text}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Peer B Quick Reply input */}
+                      <div className="pt-2 border-t border-[#1e1e1e] flex gap-2 items-center">
+                        <span className="text-[11px] font-mono text-cyan-400 shrink-0">Peer B Reply:</span>
+                        <input
+                          type="text"
+                          placeholder="Reply as Peer B..."
+                          value={messageInputB}
+                          onChange={(e) => setMessageInputB(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSendB()}
+                          data-testid="input-msg-b"
+                          className="h-7 flex-1 rounded-[4px] border border-[#242424] bg-[#050505] px-2 text-xs font-mono text-[#ededed] placeholder:text-[#555555] focus:border-cyan-500/50 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSendB}
+                          data-testid="btn-send-b"
+                          className="inline-flex h-7 items-center justify-center rounded-[4px] border border-cyan-500/40 bg-cyan-950/30 px-3 text-xs font-mono text-cyan-300 hover:border-cyan-500/70 transition-colors"
+                        >
+                          <Send className="h-3 w-3 mr-1" />
+                          <span>Reply</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: SCTP PROTOCOL STACK */}
+                  {step6Tab === "sctp" && (
+                    <div className="h-full grid grid-cols-12 gap-2.5 font-mono text-xs">
+                      {/* Left: Dissected Protocol Layers */}
+                      <div className="col-span-6 h-full overflow-y-auto space-y-1.5 pr-1">
+                        <div className="p-2 rounded bg-[#0d0d0d] border border-purple-500/30">
+                          <div className="text-[10px] uppercase text-purple-400 font-bold">Layer 5: Application Data</div>
+                          <div className="text-xs text-[#ededed]">RTCDataChannel text strings or raw binary Blobs/ArrayBuffers</div>
+                        </div>
+                        <div className="p-2 rounded bg-[#0d0d0d] border border-cyan-500/30">
+                          <div className="text-[10px] uppercase text-cyan-400 font-bold">Layer 4: SCTP (RFC 4960 & RFC 8831)</div>
+                          <div className="text-xs text-[#ededed]">Multi-streaming association • Chunk types: DATA, SACK, HEARTBEAT</div>
+                        </div>
+                        <div className="p-2 rounded bg-[#0d0d0d] border border-emerald-500/30">
+                          <div className="text-[10px] uppercase text-emerald-400 font-bold">Layer 3: DTLS 1.3 Encryption (RFC 8261)</div>
+                          <div className="text-xs text-[#ededed]">AES-GCM session keys negotiated via TLS handshake over UDP</div>
+                        </div>
+                        <div className="p-2 rounded bg-[#0d0d0d] border border-[#222222]">
+                          <div className="text-[10px] uppercase text-[#777777] font-bold">Layer 2: UDP Datagrams & IP Wire</div>
+                          <div className="text-xs text-[#a1a1a1]">Punched NAT sockets: 192.168.1.15:54321 ➔ 103.21.44.12:49152</div>
+                        </div>
+                      </div>
+
+                      {/* Right: SCTP Channel Properties */}
+                      <div className="col-span-6 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#0c0c0c] p-2.5 space-y-2">
+                        <div className="text-xs font-semibold text-purple-300 border-b border-[#1c1c1c] pb-1">
+                          RTCDataChannel Configuration
+                        </div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
+                            <span>channel.label</span>
+                            <span className="text-[#ededed]">"lab-channel"</span>
+                          </div>
+                          <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
+                            <span>channel.id (Stream ID)</span>
+                            <span className="text-cyan-300">0</span>
+                          </div>
+                          <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
+                            <span>channel.ordered</span>
+                            <span className="text-emerald-400 font-bold">true (FIFO Guaranteed)</span>
+                          </div>
+                          <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
+                            <span>maxRetransmits</span>
+                            <span className="text-[#ededed]">null (Reliable delivery)</span>
+                          </div>
+                          <div className="flex justify-between py-0.5 text-[#888888]">
+                            <span>channel.readyState</span>
+                            <span className={peerAConnectionState === "connected" ? "text-emerald-400 font-bold" : "text-[#777777]"}>
+                              "{peerAConnectionState === "connected" ? "open" : "connecting"}"
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: RTCSTATS TELEMETRY */}
+                  {step6Tab === "stats" && (
+                    <div className="h-full overflow-y-auto space-y-2 font-mono text-xs pr-1">
+                      <div className="grid grid-cols-4 gap-2">
+                        <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
+                          <span className="text-[10px] text-[#777777] block">Selected Candidate Pair</span>
+                          <span className="text-xs font-bold text-purple-300">host ➔ srflx</span>
+                        </div>
+                        <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
+                          <span className="text-[10px] text-[#777777] block">Packets Sent / Received</span>
+                          <span className="text-xs font-bold text-emerald-400">1,248 / 1,248</span>
+                        </div>
+                        <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
+                          <span className="text-[10px] text-[#777777] block">Packet Loss Rate</span>
+                          <span className="text-xs font-bold text-emerald-400">0.00% (Lossless)</span>
+                        </div>
+                        <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
+                          <span className="text-[10px] text-[#777777] block">Jitter / Delay Buffer</span>
+                          <span className="text-xs font-bold text-cyan-300">0.00 ms</span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[6px] border border-purple-500/30 bg-purple-950/20 p-2 text-xs flex items-center justify-between">
+                        <span className="text-purple-200">
+                          <strong>PeerConnection Active:</strong> True direct peer-to-peer transport with hardware-accelerated video rendering and zero signaling latency.
+                        </span>
+                        <span className="text-[10px] font-mono text-purple-400 font-semibold">W3C WebRTC 1.0</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
