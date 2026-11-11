@@ -198,7 +198,48 @@ test("capture styleguide screenshots at desktop and mobile viewports", async ({ 
     fullPage: false,
   });
 
-  // 7. Beginner Lab with React Bits (Mobile)
+  // 7. Step 5 Media Streams & Tracks Bento
+  await page.locator("header").getByRole("button", { name: "Next" }).click();
+  await page.waitForSelector("text=Hooking up the Cameras (Media Streams & Tracks)");
+  await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelectorAll('*').forEach((el) => {
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    });
+  });
+
+  // Request synthetic/camera media feed
+  await page.locator("button:has-text('Request Camera / Synthetic Feed')").click();
+  await page.waitForSelector("text=Feed Active", { timeout: 5000 });
+  await page.waitForTimeout(800);
+
+  // Capture Step 5 Active: Live Track Telemetry
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step5-active-tracks.png"),
+    fullPage: false,
+  });
+
+  // Switch to Constraints Playground
+  await page.locator("button:has-text('Constraints Playground')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step5-active-constraints.png"),
+    fullPage: false,
+  });
+
+  // Switch to W3C State Machine
+  await page.locator("button:has-text('W3C State Machine')").click();
+  await page.waitForTimeout(300);
+  await page.screenshot({
+    path: path.join(screenshotsDir, "beginner-lab-step5-active-states.png"),
+    fullPage: false,
+  });
+
+  // 8. Beginner Lab with React Bits (Mobile)
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: path.join(screenshotsDir, "beginner-lab-react-bits-mobile.png"),

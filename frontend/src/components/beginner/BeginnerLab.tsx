@@ -46,6 +46,12 @@ import {
   CheckCheck,
   Eye,
   BookOpen,
+  VideoOff,
+  Mic,
+  MicOff,
+  Sliders,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useLabStore, type CandidateInfo } from "@/store/labStore";
 import { loopbackService } from "@/services/loopback.service";
@@ -550,6 +556,76 @@ a=setup:actpass`;
     },
   ];
 
+  // Step 5 Media Streams & Tracks State
+  const [step5Tab, setStep5Tab] = useState<"tracks" | "constraints" | "states">("tracks");
+  const [isMicMuted, setIsMicMuted] = useState<boolean>(false);
+  const [isVideoMuted, setIsVideoMuted] = useState<boolean>(false);
+  const [selectedResolution, setSelectedResolution] = useState<"480p" | "720p" | "1080p">("720p");
+  const [selectedFrameRate, setSelectedFrameRate] = useState<24 | 30 | 60>(30);
+  const [echoCancellation, setEchoCancellation] = useState<boolean>(true);
+  const [noiseSuppression, setNoiseSuppression] = useState<boolean>(true);
+  const [autoGainControl, setAutoGainControl] = useState<boolean>(true);
+
+  // Step 5 Interactive Handlers
+  const handleToggleMic = () => {
+    const nextMuted = !isMicMuted;
+    setIsMicMuted(nextMuted);
+    if (localMediaStream) {
+      localMediaStream.getAudioTracks().forEach((t) => {
+        t.enabled = !nextMuted;
+      });
+    }
+    setCallChipLabel(nextMuted ? "audio_track_muted_silence" : "audio_track_unmuted_live");
+    setCallChipState("success");
+    setCallChipDuration(500);
+
+    setLastReaction({
+      title: nextMuted ? "Microphone Track Muted" : "Microphone Track Unmuted",
+      detail: nextMuted
+        ? "audioTrack.enabled = false: Browser transmits silent RTP audio packets over SRTP. No SDP renegotiation is triggered."
+        : "audioTrack.enabled = true: Microphone hardware audio stream unmuted and encoding Opus packets at 48kHz.",
+      badge: nextMuted ? "MIC MUTED" : "MIC ACTIVE",
+      timestamp: new Date().toLocaleTimeString(),
+    });
+  };
+
+  const handleToggleVideo = () => {
+    const nextMuted = !isVideoMuted;
+    setIsVideoMuted(nextMuted);
+    if (localMediaStream) {
+      localMediaStream.getVideoTracks().forEach((t) => {
+        t.enabled = !nextMuted;
+      });
+    }
+    setCallChipLabel(nextMuted ? "video_track_disabled_black" : "video_track_enabled_live");
+    setCallChipState("success");
+    setCallChipDuration(500);
+
+    setLastReaction({
+      title: nextMuted ? "Video Track Disabled (Black Frames)" : "Video Track Enabled",
+      detail: nextMuted
+        ? "videoTrack.enabled = false: Browser transmits black video frames over DTLS-SRTP without renegotiating the SDP offer/answer!"
+        : "videoTrack.enabled = true: Hardware camera frames restored and flowing to the encoder pipeline.",
+      badge: nextMuted ? "CAM MUTED" : "CAM ACTIVE",
+      timestamp: new Date().toLocaleTimeString(),
+    });
+  };
+
+  const handleSetResolutionPreset = (res: "480p" | "720p" | "1080p") => {
+    setSelectedResolution(res);
+    setCallChipLabel(`constraint_resolution_${res}`);
+    setCallChipState("success");
+    setCallChipDuration(400);
+
+    const dims = res === "1080p" ? "1920x1080 (Full HD)" : res === "720p" ? "1280x720 (HD)" : "640x480 (SD)";
+    setLastReaction({
+      title: `Applied Resolution Constraint: ${res.toUpperCase()}`,
+      detail: `Ideal dimension constraint set to ${dims}. MediaTrackConstraints passed to getUserMedia() negotiates with camera driver.`,
+      badge: res.toUpperCase(),
+      timestamp: new Date().toLocaleTimeString(),
+    });
+  };
+
   // Video Refs for Step 5
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -809,7 +885,7 @@ a=setup:actpass`;
 
         setLastReaction({
           title: "Hardware Camera Track Attached",
-          detail: "Feed Active: Live video track bound to RTCPeerConnection via addTrack(). Encrypted via DTLS-SRTP.",
+          detail: "Live video track bound to RTCPeerConnection via addTrack(). Encrypted via DTLS-SRTP.",
           badge: "MEDIA LIVE",
           timestamp: new Date().toLocaleTimeString(),
         });
@@ -828,7 +904,7 @@ a=setup:actpass`;
 
       setLastReaction({
         title: "Synthetic 30FPS Test Video Stream Attached",
-        detail: "Feed Active: Rendered canvas test pattern track bound to Peer A and encoded via VP8.",
+        detail: "Rendered canvas test pattern track bound to Peer A and encoded via VP8.",
         badge: "SYNTHETIC VIDEO",
         timestamp: new Date().toLocaleTimeString(),
       });
@@ -2560,9 +2636,20 @@ a=setup:actpass`;
 
                   <button
                     type="button"
-                    onClick={() => setSelectedNatTypeIndex((prev) => (prev + 1) % natTypeEntries.length)}
+                    onClick={() => {
+                      const nextIdx = (selectedNatTypeIndex + 1) % natTypeEntries.length;
+                      setSelectedNatTypeIndex(nextIdx);
+                      setStep4Tab("types");
+                      const entry = natTypeEntries[nextIdx];
+                      setLastReaction({
+                        title: `NAT Router Switched: ${entry.type}`,
+                        detail: `${entry.behavior} P2P Direct Punching Feasibility: ${entry.p2pFeasibility}. (Example: ${entry.example})`,
+                        badge: entry.badge,
+                        timestamp: new Date().toLocaleTimeString(),
+                      });
+                    }}
                     className="px-3.5 h-9 rounded-[6px] border border-[#242424] bg-[#141414] text-xs sm:text-sm font-mono text-[#ededed] hover:border-[#404040] hover:bg-[#1a1a1a] transition-all flex items-center gap-1.5"
-                    title="Cycle NAT Router Types"
+                    title="Cycle and inspect NAT Router Types"
                   >
                     <Eye className="h-3.5 w-3.5 text-cyan-400" />
                     <span>NAT Type ({selectedNatTypeIndex + 1}/{natTypeEntries.length})</span>
@@ -2683,10 +2770,17 @@ a=setup:actpass`;
                 <div className="grid grid-cols-4 gap-2 pt-1 border-t border-[#1e1e1e]">
                   <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
                     <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
-                      <Shield className="h-3 w-3 text-purple-400" />
-                      <span>NAT Type</span>
+                      <Shield className={`h-3 w-3 ${selectedNatTypeIndex === 3 ? "text-red-400" : "text-purple-400"}`} />
+                      <span>NAT ({selectedNatTypeIndex + 1}/4)</span>
                     </div>
-                    <div className="text-xs font-bold text-[#ededed] font-mono truncate">Port-Restricted</div>
+                    <div
+                      className={`text-xs font-bold font-mono truncate ${
+                        selectedNatTypeIndex === 3 ? "text-red-400" : "text-purple-300"
+                      }`}
+                      title={natTypeEntries[selectedNatTypeIndex]?.type}
+                    >
+                      {natTypeEntries[selectedNatTypeIndex]?.type.split(" ")[0]} {selectedNatTypeIndex === 3 ? "NAT" : "Cone"}
+                    </div>
                   </div>
 
                   <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
@@ -2699,11 +2793,25 @@ a=setup:actpass`;
 
                   <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
                     <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      {selectedNatTypeIndex === 3 ? (
+                        <ShieldAlert className="h-3 w-3 text-red-400" />
+                      ) : (
+                        <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      )}
                       <span>Pinhole State</span>
                     </div>
-                    <div className={`text-xs font-bold font-mono ${natPinholeActive ? "text-emerald-400" : "text-[#777777]"}`}>
-                      {natPinholeActive ? "UDP:49152 Active" : "Standby"}
+                    <div className={`text-xs font-bold font-mono truncate ${
+                      selectedNatTypeIndex === 3
+                        ? "text-red-400"
+                        : natPinholeActive
+                        ? "text-emerald-400"
+                        : "text-[#777777]"
+                    }`}>
+                      {selectedNatTypeIndex === 3
+                        ? "Blocked (Needs TURN)"
+                        : natPinholeActive
+                        ? "UDP:49152 Active"
+                        : "Standby"}
                     </div>
                   </div>
 
@@ -2927,9 +3035,635 @@ a=setup:actpass`;
               </div>
             </div>
           </motion.div>
+        ) : currentStep === 5 ? (
+          /* ============================================================== */
+          /* STEP 5: HOOKING UP THE CAMERAS (MEDIA STREAMS & TRACKS) BENTO  */
+          /* ============================================================== */
+          <motion.div
+            key="step-5-media-bento"
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 min-h-0 w-full grid grid-cols-12 grid-rows-1 gap-2.5"
+          >
+            {/* LEFT COLUMN: GUIDANCE, DIRECTIVES & REACTION FEED (Col 5) */}
+            <div className="col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col justify-between overflow-hidden rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3.5 shadow-sm">
+              <div className="space-y-2 overflow-y-auto pr-1">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono tracking-wider uppercase text-purple-300 font-semibold">
+                      Step 5 of 6 • Curriculum
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      RFC 8829 • W3C Media Capture
+                    </span>
+                  </div>
+                  {mediaStatus !== "idle" && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-emerald-500/40 bg-emerald-950/30 text-emerald-400 font-bold">
+                      Feed Active
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="text-base sm:text-lg font-semibold tracking-tight text-[#ededed]">
+                    Hooking up the Cameras (Media Streams & Tracks)
+                  </h2>
+                  <p className="text-xs text-[#888888]">
+                    Acquiring hardware camera & mic buffers, negotiating codecs, and streaming RTP tracks.
+                  </p>
+                </div>
+
+                {/* 2-line "Why Are We Doing This?" Card */}
+                <div className="rounded-[6px] border border-purple-500/30 bg-purple-950/20 p-2.5 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-200">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                    <span>Why Are We Doing This?</span>
+                  </div>
+                  <p className="text-xs text-purple-200/90 leading-relaxed font-mono">
+                    Before peers can stream live video, the browser must capture hardware devices via <code className="text-purple-300 font-bold">getUserMedia()</code>, package raw buffers into discrete <code className="text-purple-300 font-bold">MediaStreamTracks</code>, and bind them to the RTCPeerConnection for hardware-accelerated encoding.
+                  </p>
+                </div>
+
+                {/* The Media Capture Pipeline */}
+                <div className="rounded-[6px] border border-[#222222] bg-[#121212] p-2 space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                    <Video className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>The Media Capture Pipeline</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1 text-center font-mono text-[10px] pt-1">
+                    <div className="p-1 rounded bg-[#181818] border border-[#262626] text-[#ededed]">
+                      Hardware (Mic/Cam)
+                    </div>
+                    <div className="p-1 rounded bg-[#181818] border border-[#262626] text-purple-300">
+                      getUserMedia()
+                    </div>
+                    <div className="p-1 rounded bg-[#181818] border border-[#262626] text-cyan-300">
+                      MediaStreamTrack
+                    </div>
+                    <div className="p-1 rounded bg-[#181818] border border-[#262626] text-emerald-300">
+                      DTLS-SRTP RTP
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mental Model & Analogy */}
+                <div className="rounded-[6px] border border-[#222222] bg-[#121212] p-2.5 space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Mental Model & Analogy</span>
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                    <strong className="text-[#ededed]">The TV Broadcast Studio: </strong>
+                    A camera is not one monolith — it produces separate Video and Audio Tracks. The audio/video mixing board synchronizes them into a single broadcast program feed (<code className="text-purple-300">MediaStream</code>). The director can mute a microphone fader (<code className="text-purple-300">audioTrack.enabled = false</code>) without tearing down the satellite transmission link!
+                  </p>
+                </div>
+
+                {/* Key Protocol Fact */}
+                <div className="rounded-[6px] border border-[#222222] bg-[#121212] p-2.5 space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#777777] flex items-center gap-1.5">
+                    <Key className="h-3.5 w-3.5 text-purple-400" />
+                    <span>Key Protocol Fact: Zero-Renegotiation Muting (RFC 8829)</span>
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] leading-relaxed">
+                    Toggling <code className="text-purple-300">track.enabled = false</code> sends black video frames or silence over existing SRTP packets without triggering renegotiation. In contrast, removing a track requires a full SDP Offer/Answer round-trip!
+                  </p>
+                </div>
+              </div>
+
+              {/* Lower Section: Interactive Directives & Reaction */}
+              <div className="pt-2 space-y-2 border-t border-[#1e1e1e]">
+                {/* Primary & Quick Action Controls */}
+                <div className="space-y-1.5">
+                  <SpecularButton
+                    onClick={handleRequestMedia}
+                    className="w-full h-9 text-xs sm:text-sm font-semibold shadow-sm"
+                  >
+                    <Video className="h-4 w-4 mr-1 text-purple-400" />
+                    <span>Request Camera / Synthetic Feed</span>
+                  </SpecularButton>
+
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleToggleMic}
+                      className={`h-8 rounded-[6px] border text-xs font-mono transition-all flex items-center justify-center gap-1.5 ${
+                        isMicMuted
+                          ? "border-red-500/50 bg-red-950/20 text-red-300"
+                          : "border-[#242424] bg-[#141414] text-[#ededed] hover:border-[#404040]"
+                      }`}
+                    >
+                      {isMicMuted ? <MicOff className="h-3.5 w-3.5 text-red-400" /> : <Mic className="h-3.5 w-3.5 text-emerald-400" />}
+                      <span>{isMicMuted ? "Mic Muted" : "Mute Mic"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleToggleVideo}
+                      className={`h-8 rounded-[6px] border text-xs font-mono transition-all flex items-center justify-center gap-1.5 ${
+                        isVideoMuted
+                          ? "border-amber-500/50 bg-amber-950/20 text-amber-300"
+                          : "border-[#242424] bg-[#141414] text-[#ededed] hover:border-[#404040]"
+                      }`}
+                    >
+                      {isVideoMuted ? <VideoOff className="h-3.5 w-3.5 text-amber-400" /> : <Video className="h-3.5 w-3.5 text-purple-400" />}
+                      <span>{isVideoMuted ? "Cam Off" : "Cam On"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = selectedResolution === "720p" ? "1080p" : selectedResolution === "1080p" ? "480p" : "720p";
+                        handleSetResolutionPreset(next);
+                      }}
+                      className="h-8 rounded-[6px] border border-[#242424] bg-[#141414] text-xs font-mono text-[#ededed] hover:border-[#404040] transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Sliders className="h-3.5 w-3.5 text-cyan-400" />
+                      <span>{selectedResolution.toUpperCase()}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Action Reaction Feed */}
+                <div className="rounded-[8px] border border-[#262626] bg-[#111111] p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span className="text-xs sm:text-sm font-semibold text-[#ededed]">
+                        {lastReaction.title}
+                      </span>
+                    </div>
+                    {lastReaction.badge && (
+                      <span className="rounded bg-[#1c1c1c] px-2 py-0.5 text-xs font-mono text-purple-300 border border-[#2c2c2c]">
+                        {lastReaction.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#a1a1a1] font-mono leading-relaxed truncate">
+                    {lastReaction.detail}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: SIMULATION STAGE & TRACK DEEP X-RAY (Col 7) */}
+            <div className="col-span-12 lg:col-span-7 h-full min-h-0 flex flex-col gap-2.5">
+              {/* TOP: LIVE CAMERA / SYNTHETIC MONITOR STAGE (Height ~44%) */}
+              <div className="h-[44%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Video className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed]">
+                      Media Studio & Stream Monitor
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-[4px] border ${
+                        mediaStatus !== "idle"
+                          ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-400 font-bold"
+                          : "border-[#262626] bg-[#141414] text-[#777777]"
+                      }`}
+                    >
+                      {mediaStatus !== "idle" ? "Hardware Online" : "Stream Standby"}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-[4px] border border-purple-500/30 bg-purple-950/20 text-purple-300">
+                      [STUDIO PREVIEW]
+                    </span>
+                  </div>
+                </div>
+
+                {/* Video Monitor Box with HUD */}
+                <div className="relative my-auto h-[68%] w-full overflow-hidden rounded-[6px] border border-[#242424] bg-black flex items-center justify-center">
+                  {localMediaStream ? (
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`h-full w-full object-contain transition-opacity duration-300 ${
+                        isVideoMuted ? "opacity-15 filter grayscale" : "opacity-100"
+                      }`}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-1.5 text-center p-3">
+                      <Video className="h-7 w-7 text-purple-500/40 animate-pulse" />
+                      <span className="text-xs font-mono text-[#a1a1a1]">No Active MediaStream Detected</span>
+                      <span className="text-[10px] text-[#666666]">
+                        Click "Request Camera / Synthetic Feed" to capture hardware or 30fps test pattern
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Black Frames Overlay when Video Disabled */}
+                  {isVideoMuted && localMediaStream && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 gap-1 z-20">
+                      <VideoOff className="h-6 w-6 text-amber-400" />
+                      <span className="text-xs font-mono text-amber-300 font-semibold">Video Track Disabled</span>
+                      <span className="text-[10px] font-mono text-[#888888]">Transmitting Black Frames (Zero SDP Renegotiation)</span>
+                    </div>
+                  )}
+
+                  {/* Live HUD Overlays */}
+                  {mediaStatus !== "idle" && (
+                    <>
+                      {/* Top Left: Rec status */}
+                      <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 rounded-[4px] bg-black/70 px-2 py-0.5 border border-[#2a2a2a] text-[10px] font-mono text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>LIVE STREAM • 30 FPS</span>
+                      </div>
+
+                      {/* Top Right: Resolution Badge */}
+                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-[4px] bg-black/70 px-2 py-0.5 border border-purple-500/30 text-[10px] font-mono text-purple-300">
+                        <span className="font-semibold">{selectedResolution.toUpperCase()}</span>
+                        <span className="text-[#888888]">({selectedResolution === "1080p" ? "1920x1080" : selectedResolution === "720p" ? "1280x720" : "640x480"})</span>
+                      </div>
+
+                      {/* Bottom Left: Audio VU Meter */}
+                      <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 rounded-[4px] bg-black/70 px-2 py-1 border border-[#2a2a2a]">
+                        {isMicMuted ? (
+                          <VolumeX className="h-3.5 w-3.5 text-red-400" />
+                        ) : (
+                          <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                        )}
+                        <div className="flex items-end gap-0.5 h-3 w-16">
+                          <span className={`w-1 rounded-sm transition-all ${isMicMuted ? "h-1 bg-red-500/40" : "h-2 bg-emerald-400 animate-pulse"}`} />
+                          <span className={`w-1 rounded-sm transition-all ${isMicMuted ? "h-1 bg-red-500/40" : "h-3 bg-emerald-400 animate-bounce"}`} />
+                          <span className={`w-1 rounded-sm transition-all ${isMicMuted ? "h-1 bg-red-500/40" : "h-2.5 bg-emerald-400"}`} />
+                          <span className={`w-1 rounded-sm transition-all ${isMicMuted ? "h-1 bg-red-500/40" : "h-1.5 bg-emerald-400"}`} />
+                          <span className={`w-1 rounded-sm transition-all ${isMicMuted ? "h-1 bg-red-500/40" : "h-2 bg-emerald-400 animate-pulse"}`} />
+                        </div>
+                        <span className="text-[9px] font-mono text-[#888888]">
+                          {isMicMuted ? "MUTED" : "48kHz"}
+                        </span>
+                      </div>
+
+                      {/* Bottom Right: Codec Encryption */}
+                      <div className="absolute bottom-2 right-2 z-10 rounded-[4px] bg-black/70 px-2 py-0.5 border border-cyan-500/30 text-[9px] font-mono text-cyan-300">
+                        VP8 • SRTP Encrypted
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Status Chips Row */}
+                <div className="grid grid-cols-4 gap-2 pt-1 border-t border-[#1e1e1e]">
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Video className={`h-3 w-3 ${isVideoMuted ? "text-amber-400" : "text-purple-400"}`} />
+                      <span>Video Track</span>
+                    </div>
+                    <div className={`text-xs font-bold font-mono truncate ${
+                      isVideoMuted ? "text-amber-400" : mediaStatus !== "idle" ? "text-purple-300" : "text-[#777777]"
+                    }`}>
+                      {isVideoMuted ? "Disabled (Black)" : mediaStatus !== "idle" ? "Live (30 FPS)" : "Standby"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Mic className={`h-3 w-3 ${isMicMuted ? "text-red-400" : "text-cyan-400"}`} />
+                      <span>Audio Track</span>
+                    </div>
+                    <div className={`text-xs font-bold font-mono truncate ${
+                      isMicMuted ? "text-red-400" : mediaStatus !== "idle" ? "text-cyan-300" : "text-[#777777]"
+                    }`}>
+                      {isMicMuted ? "Muted (Silence)" : mediaStatus !== "idle" ? "Active (Opus)" : "Standby"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Radio className="h-3 w-3 text-emerald-400" />
+                      <span>Codecs</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#ededed] font-mono truncate">
+                      VP8 / Opus
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[#222222] bg-[#111111] p-1.5 text-center">
+                    <div className="flex items-center justify-center gap-1 text-[11px] font-mono text-[#888888]">
+                      <Shield className="h-3 w-3 text-purple-400" />
+                      <span>Encryption</span>
+                    </div>
+                    <div className="text-xs font-bold text-purple-300 font-mono">
+                      DTLS 1.3 / SRTP
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BOTTOM: MEDIASTREAM & TRACK DEEP X-RAY (Height ~56%) */}
+              <div className="h-[56%] rounded-[8px] border border-[#242424] bg-[#0a0a0a] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#1e1e1e] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#ededed] flex items-center gap-1.5">
+                      <span>W3C MediaStream & Track Inspector</span>
+                    </span>
+                  </div>
+
+                  {/* Mode Switcher Tabs */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center rounded-[6px] bg-[#141414] p-0.5 border border-[#222222]">
+                      <button
+                        type="button"
+                        onClick={() => setStep5Tab("tracks")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step5Tab === "tracks"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Video className="h-3.5 w-3.5" />
+                        <span>Live Track Telemetry</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep5Tab("constraints")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step5Tab === "constraints"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Sliders className="h-3.5 w-3.5" />
+                        <span>Constraints Playground</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep5Tab("states")}
+                        className={`flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-mono transition-colors ${
+                          step5Tab === "states"
+                            ? "bg-[#252525] text-purple-300 font-semibold shadow-sm"
+                            : "text-[#777777] hover:text-[#ededed]"
+                        }`}
+                      >
+                        <Activity className="h-3.5 w-3.5" />
+                        <span>W3C State Machine</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tab Content Display */}
+                <div className="flex-1 min-h-0 pt-2 overflow-hidden">
+                  {/* TAB 1: LIVE TRACK TELEMETRY */}
+                  {step5Tab === "tracks" && (
+                    <div className="h-full grid grid-cols-12 gap-2.5">
+                      {/* Sub-Col 1: Video Track */}
+                      <div className="col-span-6 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#0c0c0c] p-2.5 space-y-2">
+                        <div className="flex items-center justify-between border-b border-[#1c1c1c] pb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <Video className="h-3.5 w-3.5 text-purple-400" />
+                            <span className="font-semibold text-xs text-[#ededed]">Video Track (MediaStreamTrack)</span>
+                          </div>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                            isVideoMuted ? "border-amber-500/30 text-amber-300 bg-amber-950/20" : "border-emerald-500/30 text-emerald-300 bg-emerald-950/20"
+                          }`}>
+                            {isVideoMuted ? "enabled: false" : "enabled: true"}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 text-xs font-mono">
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>track.id</span>
+                            <span className="text-purple-300">track-vid-8829-01</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>track.kind</span>
+                            <span className="text-[#ededed]">"video"</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>track.label</span>
+                            <span className="text-[#ededed] truncate max-w-[180px]">
+                              {mediaStatus === "live" ? "FaceTime HD Camera (Built-in)" : "Synthetic 30fps Canvas"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>track.readyState</span>
+                            <span className={mediaStatus !== "idle" ? "text-emerald-400 font-bold" : "text-[#777777]"}>
+                              "{mediaStatus !== "idle" ? "live" : "ended"}"
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>resolution / fps</span>
+                            <span className="text-cyan-300 font-semibold">{selectedResolution.toUpperCase()} • 30fps</span>
+                          </div>
+                          <div className="flex justify-between py-1 text-[#888888]">
+                            <span>track.contentHint</span>
+                            <span className="text-[#ededed]">"motion" (Smooth Video)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sub-Col 2: Audio Track */}
+                      <div className="col-span-6 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#0c0c0c] p-2.5 space-y-2">
+                        <div className="flex items-center justify-between border-b border-[#1c1c1c] pb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <Mic className="h-3.5 w-3.5 text-cyan-400" />
+                            <span className="font-semibold text-xs text-[#ededed]">Audio Track (MediaStreamTrack)</span>
+                          </div>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                            isMicMuted ? "border-red-500/30 text-red-300 bg-red-950/20" : "border-emerald-500/30 text-emerald-300 bg-emerald-950/20"
+                          }`}>
+                            {isMicMuted ? "enabled: false" : "enabled: true"}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 text-xs font-mono">
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>track.id</span>
+                            <span className="text-cyan-300">track-aud-8829-02</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>track.kind</span>
+                            <span className="text-[#ededed]">"audio"</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>track.label</span>
+                            <span className="text-[#ededed] truncate max-w-[180px]">MacBook Microphone (Built-in)</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>channels / sampleRate</span>
+                            <span className="text-cyan-300">2 (Stereo) • 48000 Hz</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-[#181818] text-[#888888]">
+                            <span>dsp echoCancellation</span>
+                            <span className={echoCancellation ? "text-emerald-400" : "text-[#777777]"}>
+                              {echoCancellation ? "true (Active)" : "false"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1 text-[#888888]">
+                            <span>track.contentHint</span>
+                            <span className="text-[#ededed]">"speech" (Opus Voice)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: CONSTRAINTS PLAYGROUND */}
+                  {step5Tab === "constraints" && (
+                    <div className="h-full grid grid-cols-12 gap-2.5">
+                      {/* Left: Interactive Controls */}
+                      <div className="col-span-6 h-full overflow-y-auto space-y-2 pr-1">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-mono text-[#888888] uppercase block">Resolution Constraint (video.width / height)</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {(["480p", "720p", "1080p"] as const).map((res) => (
+                              <button
+                                key={res}
+                                type="button"
+                                onClick={() => handleSetResolutionPreset(res)}
+                                className={`h-8 rounded-[4px] border text-xs font-mono transition-all ${
+                                  selectedResolution === res
+                                    ? "border-purple-500/60 bg-purple-950/30 text-purple-300 font-bold"
+                                    : "border-[#222222] bg-[#121212] text-[#888888] hover:text-[#ededed]"
+                                }`}
+                              >
+                                {res.toUpperCase()}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-mono text-[#888888] uppercase block">Target Frame Rate (video.frameRate)</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {([24, 30, 60] as const).map((fps) => (
+                              <button
+                                key={fps}
+                                type="button"
+                                onClick={() => setSelectedFrameRate(fps)}
+                                className={`h-8 rounded-[4px] border text-xs font-mono transition-all ${
+                                  selectedFrameRate === fps
+                                    ? "border-purple-500/60 bg-purple-950/30 text-purple-300 font-bold"
+                                    : "border-[#222222] bg-[#121212] text-[#888888] hover:text-[#ededed]"
+                                }`}
+                              >
+                                {fps} FPS
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-mono text-[#888888] uppercase block">Audio DSP Processing</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEchoCancellation((p) => !p)}
+                              className={`h-8 rounded-[4px] border text-[11px] font-mono transition-all ${
+                                echoCancellation
+                                  ? "border-cyan-500/60 bg-cyan-950/30 text-cyan-300"
+                                  : "border-[#222222] bg-[#121212] text-[#666666]"
+                              }`}
+                            >
+                              Echo Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNoiseSuppression((p) => !p)}
+                              className={`h-8 rounded-[4px] border text-[11px] font-mono transition-all ${
+                                noiseSuppression
+                                  ? "border-cyan-500/60 bg-cyan-950/30 text-cyan-300"
+                                  : "border-[#222222] bg-[#121212] text-[#666666]"
+                              }`}
+                            >
+                              Noise Suppress
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAutoGainControl((p) => !p)}
+                              className={`h-8 rounded-[4px] border text-[11px] font-mono transition-all ${
+                                autoGainControl
+                                  ? "border-cyan-500/60 bg-cyan-950/30 text-cyan-300"
+                                  : "border-[#222222] bg-[#121212] text-[#666666]"
+                              }`}
+                            >
+                              Auto Gain
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Live Generated JSON code block */}
+                      <div className="col-span-6 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#050505] p-2.5 font-mono text-[11px] text-[#ededed]">
+                        <div className="text-[10px] text-[#888888] border-b border-[#1c1c1c] pb-1 mb-1.5 flex justify-between">
+                          <span>GENERATED MediaTrackConstraints</span>
+                          <span className="text-purple-400">navigator.mediaDevices.getUserMedia()</span>
+                        </div>
+                        <pre className="text-purple-300/90 leading-relaxed overflow-x-auto">
+{`const constraints = {
+  video: {
+    width: { ideal: ${selectedResolution === "1080p" ? 1920 : selectedResolution === "720p" ? 1280 : 640} },
+    height: { ideal: ${selectedResolution === "1080p" ? 1080 : selectedResolution === "720p" ? 720 : 480} },
+    frameRate: { ideal: ${selectedFrameRate} }
+  },
+  audio: {
+    echoCancellation: ${echoCancellation},
+    noiseSuppression: ${noiseSuppression},
+    autoGainControl: ${autoGainControl}
+  }
+};
+const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: W3C STATE MACHINE */}
+                  {step5Tab === "states" && (
+                    <div className="h-full overflow-y-auto space-y-2 pr-1 text-xs font-mono">
+                      <div className="grid grid-cols-4 gap-2">
+                        <div className="rounded-[6px] border border-[#262626] bg-[#0c0c0c] p-2 space-y-1">
+                          <div className="text-xs font-bold text-cyan-300">1. INITIAL</div>
+                          <div className="text-[11px] text-[#888888]">Before getUserMedia(). Track object does not exist. Hardware idle.</div>
+                          <div className="text-[10px] text-cyan-400 font-semibold">SDP: m=video inactive</div>
+                        </div>
+
+                        <div className="rounded-[6px] border border-emerald-500/40 bg-emerald-950/20 p-2 space-y-1">
+                          <div className="text-xs font-bold text-emerald-400">2. LIVE</div>
+                          <div className="text-[11px] text-[#888888]">User granted permission. Camera capturing frames. Encoded into SRTP.</div>
+                          <div className="text-[10px] text-emerald-300 font-semibold">SDP: m=video sendrecv</div>
+                        </div>
+
+                        <div className="rounded-[6px] border border-amber-500/40 bg-amber-950/20 p-2 space-y-1">
+                          <div className="text-xs font-bold text-amber-300">3. DISABLED (Muted)</div>
+                          <div className="text-[11px] text-[#888888]">track.enabled = false. Emits black frames or silence. Hardware stays ON.</div>
+                          <div className="text-[10px] text-amber-400 font-bold">Zero Renegotiation!</div>
+                        </div>
+
+                        <div className="rounded-[6px] border border-red-500/40 bg-red-950/20 p-2 space-y-1">
+                          <div className="text-xs font-bold text-red-400">4. ENDED</div>
+                          <div className="text-[11px] text-[#888888]">track.stop() called. Hardware LED powers off. Permanent termination.</div>
+                          <div className="text-[10px] text-red-300 font-semibold">Requires Offer/Answer</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[6px] border border-purple-500/30 bg-purple-950/20 p-2 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
+                          <span className="text-purple-200">
+                            <strong>RTCRtpSender.replaceTrack()</strong> lets you swap cameras (front ➔ back or screen share) without any renegotiation glitch!
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-purple-400 font-semibold">RFC 8829 §5.2</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
         ) : (
           /* ============================================================== */
-          /* STEPS 5-6: THE ACTIVE WEBRTC EXPERIMENTATION ARENA (BENTO)     */
+          /* STEP 6: THE DIRECT WIRE (DATA CHANNELS & LIVE PEER CALL) ARENA */
           /* ============================================================== */
           <motion.div
             key="steps-5-6-bento"
