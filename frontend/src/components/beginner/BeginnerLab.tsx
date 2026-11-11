@@ -626,6 +626,42 @@ a=setup:actpass`;
 
   // Step 6 State
   const [step6Tab, setStep6Tab] = useState<"chat" | "sctp" | "stats">("chat");
+  const [statsTelemetry, setStatsTelemetry] = useState({
+    rttMs: 1.2,
+    bytesSent: 0,
+    bytesReceived: 0,
+    packetsSent: 0,
+    packetsReceived: 0,
+    nominatedPair: "192.168.1.15:54321 ➔ 103.21.44.12:49152 (srflx)",
+  });
+
+  // Step 6: Auto-connect and live RTCStats polling
+  useEffect(() => {
+    if (currentStep !== 6) return;
+
+    if (peerAConnectionState !== "connected" || peerBConnectionState !== "connected") {
+      if (!localMediaStream) {
+        try {
+          const { stream, stop } = createSyntheticMediaStream(320, 240, "Peer A Camera (Caller)");
+          syntheticMediaStopRef.current = stop;
+          loopbackService.attachMediaStream(stream);
+          setMediaStatus("synthetic");
+        } catch {
+          // ignore
+        }
+      }
+      loopbackService.autoConnect();
+    }
+
+    const pollStats = async () => {
+      const report = await loopbackService.getStatsReport();
+      setStatsTelemetry(report);
+    };
+
+    pollStats();
+    const interval = setInterval(pollStats, 800);
+    return () => clearInterval(interval);
+  }, [currentStep, peerAConnectionState, peerBConnectionState, localMediaStream]);
 
   // Step 5: Stop media tracks & release hardware permissions
   const handleStopMedia = () => {
@@ -843,19 +879,31 @@ a=setup:actpass`;
 
   const handleSendA = () => {
     if (!messageInputA.trim()) return;
-    loopbackService.sendMessage("A", messageInputA.trim());
+    const text = messageInputA.trim();
+    loopbackService.sendMessage("A", text);
     setCallChipLabel("sctp_packet_sent_to_peer_b");
     setCallChipState("success");
     setCallChipDuration(120);
 
     setLastReaction({
       title: "SCTP Data Packet Sent (Peer A ➔ Peer B)",
-      detail: `Delivered message "${messageInputA.trim()}" over SCTP stream 0 via encrypted DTLS session.`,
+      detail: `Delivered message "${text}" over SCTP stream 0 via encrypted DTLS session.`,
       badge: "DATA CHANNEL",
       timestamp: new Date().toLocaleTimeString(),
     });
 
     setMessageInputA("");
+
+    // Automatically simulate Peer B response after 400ms for authentic bidirectional chatter
+    setTimeout(() => {
+      const replies = [
+        `Ack: Received "${text}" over SCTP Stream 0!`,
+        `P2P direct packet confirmed (0 bytes buffered, latency < 2ms).`,
+        `Direct wire intact. TSN sequence verified.`,
+      ];
+      const randomReply = replies[Math.floor(Math.random() * replies.length)];
+      loopbackService.sendMessage("B", randomReply);
+    }, 400);
   };
 
   const handleSendB = () => {
@@ -873,6 +921,36 @@ a=setup:actpass`;
     });
 
     setMessageInputB("");
+  };
+
+  // Step 6: Direct wire trigger
+  const handleStartDirectWire = async () => {
+    setCallChipLabel("establishing_sctp_direct_wire");
+    setCallChipState("running");
+
+    if (!localMediaStream) {
+      try {
+        const { stream, stop } = createSyntheticMediaStream(320, 240, "Peer A Camera (Caller)");
+        syntheticMediaStopRef.current = stop;
+        loopbackService.attachMediaStream(stream);
+        setMediaStatus("synthetic");
+      } catch {
+        // ignore
+      }
+    }
+
+    await loopbackService.autoConnect();
+
+    setCallChipLabel("direct_p2p_wire_connected");
+    setCallChipState("success");
+    setCallChipDuration(800);
+
+    setLastReaction({
+      title: "Direct SCTP Data Wire Connected",
+      detail: "Peer A and Peer B established a direct peer-to-peer association over DTLS-SRTP. SCTP stream 0 open and ready for zero-latency bidirectional exchange.",
+      badge: "P2P CONNECTED",
+      timestamp: new Date().toLocaleTimeString(),
+    });
   };
 
   // Step 4 NAT packet trigger with CallChip feedback & explanation
@@ -3678,12 +3756,16 @@ const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
               <div className="pt-2 space-y-2 border-t border-[#1e1e1e]">
                 {/* Primary Action Button */}
                 <SpecularButton
-                  onClick={handleStartHandshake}
+                  onClick={handleStartDirectWire}
                   data-testid="btn-start-offer"
                   className="w-full h-8 text-xs font-semibold shadow-sm"
                 >
                   <Zap className="h-3.5 w-3.5 mr-1 text-purple-400" />
-                  <span>Establish Direct SCTP Data Wire</span>
+                  <span>
+                    {peerAConnectionState === "connected" && peerBConnectionState === "connected"
+                      ? "Direct SCTP Wire Connected (Live)"
+                      : "Establish Direct SCTP Data Wire"}
+                  </span>
                 </SpecularButton>
 
                 {/* Peer A Quick Send Bar */}
@@ -4047,10 +4129,13 @@ const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
                         </div>
                       </div>
 
-                      {/* Right: SCTP Channel Properties */}
+                      {/* Right: SCTP Channel Properties & Dynamic Chunk Inspector */}
                       <div className="col-span-6 h-full overflow-y-auto rounded-[6px] border border-[#202020] bg-[#0c0c0c] p-2.5 space-y-2">
-                        <div className="text-xs font-semibold text-purple-300 border-b border-[#1c1c1c] pb-1">
-                          RTCDataChannel Configuration
+                        <div className="flex items-center justify-between border-b border-[#1c1c1c] pb-1">
+                          <span className="text-xs font-semibold text-purple-300">RTCDataChannel Telemetry</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded border border-purple-500/40 bg-purple-950/20 text-purple-300">
+                            RFC 8831
+                          </span>
                         </div>
                         <div className="space-y-1.5 text-xs">
                           <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
@@ -4066,15 +4151,44 @@ const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
                             <span className="text-emerald-400 font-bold">true (FIFO Guaranteed)</span>
                           </div>
                           <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
-                            <span>maxRetransmits</span>
-                            <span className="text-[#ededed]">null (Reliable delivery)</span>
-                          </div>
-                          <div className="flex justify-between py-0.5 text-[#888888]">
                             <span>channel.readyState</span>
-                            <span className={peerAConnectionState === "connected" ? "text-emerald-400 font-bold" : "text-[#777777]"}>
+                            <span className={peerAConnectionState === "connected" ? "text-emerald-400 font-bold flex items-center gap-1" : "text-[#777777]"}>
+                              {peerAConnectionState === "connected" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
                               "{peerAConnectionState === "connected" ? "open" : "connecting"}"
                             </span>
                           </div>
+                          <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
+                            <span>Active TSN (Sequence)</span>
+                            <span className="text-amber-300 font-mono">#TSN-{1000 + dataChannelMessages.length * 2}</span>
+                          </div>
+                          <div className="flex justify-between py-0.5 border-b border-[#161616] text-[#888888]">
+                            <span>Cumulative Payload</span>
+                            <span className="text-purple-300 font-mono">
+                              {dataChannelMessages.reduce((sum, m) => sum + m.text.length, 0)} bytes ({dataChannelMessages.length} msgs)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Last Chunk Dissector */}
+                        <div className="mt-2 rounded border border-[#242424] bg-[#080808] p-2 space-y-1">
+                          <div className="text-[10px] uppercase text-[#777777] font-bold flex items-center justify-between">
+                            <span>Last Dispatched SCTP Chunk</span>
+                            <span className="text-emerald-400 font-mono">DATA (0x00)</span>
+                          </div>
+                          {dataChannelMessages.length > 0 ? (
+                            <div className="text-[11px] text-[#ededed] space-y-0.5 font-mono">
+                              <div className="text-[#888888]">
+                                <span className="text-cyan-400">Header:</span> Src:5000 Dst:5000 VTag:0x8A92 CRC:0x93B7
+                              </div>
+                              <div className="truncate">
+                                <span className="text-purple-400">Payload:</span> "{dataChannelMessages[dataChannelMessages.length - 1].text}"
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-[#555555] italic">
+                              Association idle. Send a message to inspect the serialized SCTP chunk.
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -4086,19 +4200,86 @@ const stream = await navigator.mediaDevices.getUserMedia(constraints);`}
                       <div className="grid grid-cols-4 gap-2">
                         <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
                           <span className="text-[10px] text-[#777777] block">Selected Candidate Pair</span>
-                          <span className="text-xs font-bold text-purple-300">host ➔ srflx</span>
+                          <span className="text-xs font-bold text-purple-300 truncate block" title={statsTelemetry.nominatedPair}>
+                            {statsTelemetry.nominatedPair.includes("➔") ? "host ➔ srflx" : statsTelemetry.nominatedPair}
+                          </span>
+                          <span className="text-[9px] text-[#666666] block">Direct UDP • Nominated</span>
                         </div>
                         <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
                           <span className="text-[10px] text-[#777777] block">Packets Sent / Received</span>
-                          <span className="text-xs font-bold text-emerald-400">1,248 / 1,248</span>
+                          <span className="text-xs font-bold text-emerald-400 block">
+                            {statsTelemetry.packetsSent.toLocaleString()} / {statsTelemetry.packetsReceived.toLocaleString()}
+                          </span>
+                          <span className="text-[9px] text-emerald-500 block">0.00% Packet Loss</span>
                         </div>
                         <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
-                          <span className="text-[10px] text-[#777777] block">Packet Loss Rate</span>
-                          <span className="text-xs font-bold text-emerald-400">0.00% (Lossless)</span>
+                          <span className="text-[10px] text-[#777777] block">Throughput Volume</span>
+                          <span className="text-xs font-bold text-cyan-300 block">
+                            {(statsTelemetry.bytesSent / 1024).toFixed(1)} KB / {(statsTelemetry.bytesReceived / 1024).toFixed(1)} KB
+                          </span>
+                          <span className="text-[9px] text-[#666666] block">RTP Video + SCTP Data</span>
                         </div>
                         <div className="p-2 rounded bg-[#0c0c0c] border border-[#222222]">
-                          <span className="text-[10px] text-[#777777] block">Jitter / Delay Buffer</span>
-                          <span className="text-xs font-bold text-cyan-300">0.00 ms</span>
+                          <span className="text-[10px] text-[#777777] block">Round Trip Time (RTT)</span>
+                          <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            {statsTelemetry.rttMs} ms
+                          </span>
+                          <span className="text-[9px] text-emerald-400 block">&lt; 2ms Direct Wire</span>
+                        </div>
+                      </div>
+
+                      {/* Lower Details Bento */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-[6px] border border-[#222222] bg-[#0d0d0d] p-2 space-y-1">
+                          <span className="text-[10px] uppercase text-[#777777] font-bold block">Negotiated Codecs & Encryption</span>
+                          <div className="text-[11px] text-[#ededed] space-y-0.5">
+                            <div className="flex justify-between">
+                              <span className="text-[#888888]">Video Codec</span>
+                              <span className="text-purple-300">VP8 (clock 90kHz, payload 96)</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#888888]">Audio Codec</span>
+                              <span className="text-cyan-300">Opus (48kHz stereo, payload 111)</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#888888]">Encryption</span>
+                              <span className="text-emerald-400">DTLS 1.3 • AES_128_GCM</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-[6px] border border-[#222222] bg-[#0d0d0d] p-2 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase text-[#777777] font-bold">RTCStatsReport Polling</span>
+                            <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              Active (800ms)
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-[#ededed] space-y-0.5">
+                            <div className="flex justify-between">
+                              <span className="text-[#888888]">Jitter Buffer</span>
+                              <span className="text-emerald-400">0.00 ms (Zero Relay Delay)</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#888888]">Connection Protocol</span>
+                              <span className="text-purple-300">W3C WebRTC 1.0 (P2P Direct)</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-0.5">
+                              <span className="text-[#888888]">Candidate Transport</span>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const rep = await loopbackService.getStatsReport();
+                                  setStatsTelemetry(rep);
+                                }}
+                                className="text-[10px] font-mono px-2 py-0.5 rounded border border-purple-500/40 bg-purple-950/20 text-purple-300 hover:border-purple-500/70 transition-colors"
+                              >
+                                Poll Stats Now
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
